@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="pinkGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FF9A9E" />
+      <stop offset="100%" stop-color="#FECFEF" />
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="115" ry="115" fill="url(#pinkGradient)" />
+  <text x="256" y="310" font-family="monospace, 'Courier New', sans-serif" font-size="240" font-weight="bold" fill="#FFFFFF" text-anchor="middle">{ }</text>
+</svg>

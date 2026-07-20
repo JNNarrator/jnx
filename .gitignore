@@ -1,0 +1,36 @@
+# ─── 项目结构：仓库根在 jnx/，项目源在子目录 jnx/ ───
+
+# 截图与调试产物
+*.png
+!jnx/src-tauri/icons/**/*.png
+debug.png
+screenshot*.png
+
+# macOS / 编辑器
+.DS_Store
+.idea/
+*.swp
+*.swo
+
+# Node
+**/node_modules/
+**/dist/
+**/dist-ssr/
+*.local
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+
+# Rust / Tauri
+**/target/
+**/gen/schemas/
+
+# 日志
+logs/
+*.log
+
+# 本地环境
+.env
+.env.local
+**/.vscode/*
+!**/.vscode/extensions.json
