@@ -24,10 +24,8 @@ function save(key: string, value: string | number) {
         <NSelect
           :value="settings.values.theme"
           :options="[
-            { label: '粉色特别', value: 'pink' },
             { label: '浅色', value: 'light' },
             { label: '深色', value: 'dark' },
-            { label: '跟随系统', value: 'system' },
           ]"
           size="small"
           style="width: 160px"

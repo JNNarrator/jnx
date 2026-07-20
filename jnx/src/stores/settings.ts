@@ -19,7 +19,7 @@ export const useSettingsStore = defineStore('settings', () => {
       }
     }
     // Normalize theme value from string
-    if (raw.theme && ['light', 'dark', 'system', 'pink'].includes(raw.theme)) {
+    if (raw.theme && ['light', 'dark'].includes(raw.theme)) {
       values.theme = raw.theme as Settings['theme']
     }
     loaded = true

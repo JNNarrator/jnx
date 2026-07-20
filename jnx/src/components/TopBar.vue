@@ -8,17 +8,10 @@ import Kbd from './Kbd.vue'
 const settings = useSettingsStore()
 const palette = useCommandPaletteStore()
 
-const isDark = computed(() => {
-  const t = settings.values.theme
-  return t === 'dark' || t === 'pink' || (t === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)
-})
+const isDark = computed(() => settings.values.theme === 'dark')
 
 function toggleTheme() {
-  const t = settings.values.theme
-  if (t === 'light') settings.update('theme', 'dark')
-  else if (t === 'dark') settings.update('theme', 'pink')
-  else if (t === 'system') settings.update('theme', 'light')
-  else settings.update('theme', isDark.value ? 'light' : 'dark')
+  settings.update('theme', isDark.value ? 'light' : 'dark')
 }
 
 function openSearch() { palette.openPalette() }

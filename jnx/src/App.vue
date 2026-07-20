@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watchEffect } from 'vue'
-import { darkTheme, lightTheme, useOsTheme, NConfigProvider, NMessageProvider } from 'naive-ui'
+import { darkTheme, lightTheme, NConfigProvider, NMessageProvider } from 'naive-ui'
 import TopBar from './components/TopBar.vue'
 import Sidebar from './components/Sidebar.vue'
 import CommandPalette from './components/CommandPalette.vue'
@@ -19,7 +19,6 @@ import { usePlatform } from './composables/usePlatform'
 const tools = useToolsStore()
 const settings = useSettingsStore()
 const bindings = useShortcutBindingsStore()
-const osThemeRef = useOsTheme()
 const { isWin } = usePlatform()
 
 const loaded = ref(false)
@@ -42,11 +41,10 @@ useCommandPaletteActions()
 // ─── Theme: CSS vars on :root ───
 watchEffect(() => {
   const t = settings.values.theme
-  const isOsDark = osThemeRef.value === 'dark'
 
-  let bg, surface, sidebar, topbar, text1, text2, text3
-  let accent, accentLight, accentGlow, border, shadow, cardHover, grid, inputBg
-  let elevBg
+  let bg='', surface='', sidebar='', topbar='', text1='', text2='', text3=''
+  let accent='', accentLight='', accentGlow='', border='', shadow='', cardHover='', grid='', inputBg=''
+  let elevBg=''
 
   if (t === 'dark') {
     bg = '#161618'; surface = '#1E1E20'; sidebar = '#1A1A1C'; topbar = 'rgba(22,22,24,0.85)'
@@ -63,13 +61,6 @@ watchEffect(() => {
     border = 'rgba(232,93,117,0.1)'; shadow = 'rgba(232,93,117,0.06)'
     cardHover = 'rgba(232,93,117,0.03)'; grid = 'rgba(232,93,117,0.03)'; inputBg = 'rgba(0,0,0,0.02)'
     elevBg = '#FFF7F8'
-  } else { // pink & system dark
-    bg = '#1A1416'; surface = '#2A1F22'; sidebar = '#22181B'; topbar = 'rgba(26,20,22,0.85)'
-    text1 = '#F0E2E6'; text2 = '#B8A6AC'; text3 = '#8A7A80'
-    accent = '#FF8C9E'; accentLight = '#FFB6C1'; accentGlow = 'rgba(255,140,158,0.08)'
-    border = 'rgba(255,140,158,0.1)'; shadow = 'rgba(0,0,0,0.2)'
-    cardHover = 'rgba(255,140,158,0.04)'; grid = 'rgba(255,140,158,0.03)'; inputBg = 'rgba(255,255,255,0.04)'
-    elevBg = '#333'
   }
 
   const r = document.documentElement
@@ -100,7 +91,7 @@ watchEffect(() => {
   r.style.setProperty('--info', '#3B82F6')
   r.style.setProperty('--border-strong', 'rgba(255,140,158,0.3)')
   r.style.setProperty('--bg-elev', elevBg)
-  r.setAttribute('data-theme', t === 'system' ? (isOsDark ? 'dark' : 'light') : t)
+  r.setAttribute('data-theme', t)
 })
 
 // ─── Naive UI theme overrides for fonts ───
@@ -112,13 +103,7 @@ const themeOverrides = computed(() => ({
 }))
 
 // ─── Naive UI base theme ───
-const naiveTheme = computed(() => {
-  const t = settings.values.theme
-  if (t === 'dark') return darkTheme
-  if (t === 'light') return lightTheme
-  if (t === 'pink') return darkTheme
-  return osThemeRef.value === 'dark' ? darkTheme : lightTheme
-})
+const naiveTheme = computed(() => settings.values.theme === 'dark' ? darkTheme : lightTheme)
 
 const componentMap: Record<string, any> = {
   HomeView, ToolJson, ToolCurl, ToolClipboard, ToolSettings, ToolShortcuts,

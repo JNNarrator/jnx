@@ -15,7 +15,7 @@ export interface ClipboardItem {
 }
 
 export interface Settings {
-  theme: 'light' | 'dark' | 'system' | 'pink'
+  theme: 'light' | 'dark'
   tab_max_rows: number
   tabs_per_row: number
   clipboard_poll_interval: number
@@ -59,7 +59,7 @@ export const ALL_TOOLS: ToolTab[] = [
 ]
 
 export const DEFAULT_SETTINGS: Settings = {
-  theme: 'pink',
+  theme: 'dark',
   tab_max_rows: 3,
   tabs_per_row: 6,
   clipboard_poll_interval: 2000,
