@@ -1,0 +1,53 @@
+﻿/* JetBrains Mono - SIL Open Font License 1.1 */
+/* Source: https://github.com/JetBrains/JetBrains-Mono */
+
+/* Regular - weight 400 */
+@font-face {
+  font-family: 'JetBrains Mono';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('../fonts/JetBrainsMono-Regular.woff2') format('woff2');
+}
+
+/* Medium - weight 500 */
+@font-face {
+  font-family: 'JetBrains Mono';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('../fonts/JetBrainsMono-Medium.woff2') format('woff2');
+}
+
+/* SemiBold - weight 600 */
+@font-face {
+  font-family: 'JetBrains Mono';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('../fonts/JetBrainsMono-SemiBold.woff2') format('woff2');
+}
+
+/* Bold - weight 700 */
+@font-face {
+  font-family: 'JetBrains Mono';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('../fonts/JetBrainsMono-Bold.woff2') format('woff2');
+}
+
+/* Italic - weight 400, style italic */
+@font-face {
+  font-family: 'JetBrains Mono';
+  font-style: italic;
+  font-weight: 400;
+  font-display: swap;
+  src: url('../fonts/JetBrainsMono-Italic.woff2') format('woff2');
+}
+
+/* CSS Custom Properties */
+:root {
+  --font-mono: 'JetBrains Mono', 'Cascadia Code', 'SF Mono', Menlo, Consolas, monospace;
+  --font-sans: 'JetBrains Mono', 'Cascadia Code', 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif;
+}

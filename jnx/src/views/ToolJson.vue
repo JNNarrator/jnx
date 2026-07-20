@@ -289,7 +289,7 @@ watch(searchQuery, (val) => {
   display: flex; align-items: center; justify-content: space-between;
   padding: 6px 20px; flex-shrink: 0;
   border-top: 1px solid var(--json-border);
-  font-size: 11px; font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 11px; font-family: var(--font-mono);
   color: var(--json-text-secondary);
   background: var(--json-surface);
 }

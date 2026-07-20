@@ -177,7 +177,7 @@ defineExpose({ charCount, lineCount, cursorLine, textareaRef })
 .line-num {
   height: 22px; line-height: 22px;
   padding-right: 10px;
-  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-family: var(--font-mono);
   font-size: 12px;
   color: var(--json-line-num, #B8B8B8);
   transition: color 0.15s, background 0.15s;
@@ -201,7 +201,7 @@ defineExpose({ charCount, lineCount, cursorLine, textareaRef })
   flex: 1; min-height: 0;
   padding: 12px 14px;
   border: none; outline: none; resize: none;
-  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-family: var(--font-mono);
   font-size: 13px; line-height: 22px;
   color: var(--json-text, #1A1A1A);
   background: transparent;

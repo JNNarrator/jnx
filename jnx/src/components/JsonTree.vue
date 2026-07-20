@@ -219,7 +219,7 @@ function clickHide() { ctxMenu.value.visible = false }
 /* Tree */
 .tree-view {
   flex: 1; overflow-y: auto; padding: 8px 0;
-  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-family: var(--font-mono);
   font-size: 13px; line-height: 1.8;
   background:
     repeating-linear-gradient(to right,

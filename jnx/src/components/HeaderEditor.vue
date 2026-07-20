@@ -72,7 +72,7 @@ function remove(i: number) {
   border: 1px solid var(--border); border-radius: 6px;
   background: var(--bg-elev, var(--input-bg, rgba(0,0,0,0.02)));
   color: var(--text-1, #F0E2E6); outline: none;
-  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-family: var(--font-mono);
   transition: border-color 0.15s;
 }
 .hin:focus { border-color: var(--brand, #E85D75); }

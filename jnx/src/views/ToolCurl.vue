@@ -343,7 +343,7 @@ function statusTextClass(c: number): string {
   width: 100%; height: 100%; min-height: 60px;
   border: none; outline: none; resize: vertical;
   background: transparent; color: var(--text-1, #2D2528);
-  font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 13px; line-height: 1.6;
+  font-family: var(--font-mono); font-size: 13px; line-height: 1.6;
 }
 .body-ta::placeholder { color: var(--text-3, #8A7A80); }
 .body-ta:disabled { opacity: 0.35; }
@@ -390,11 +390,11 @@ function statusTextClass(c: number): string {
 .tab-content { flex: 1; overflow-y: auto; }
 .res-pre {
   margin: 0; padding: 12px 14px; white-space: pre-wrap; word-break: break-all;
-  font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 12px; line-height: 1.6;
+  font-family: var(--font-mono); font-size: 12px; line-height: 1.6;
   color: var(--text-1, #2D2528);
 }
 .res-headers { padding: 8px 14px; }
-.rh-row { display: flex; gap: 12px; padding: 4px 0; font-size: 12px; font-family: 'JetBrains Mono', ui-monospace, monospace; }
+.rh-row { display: flex; gap: 12px; padding: 4px 0; font-size: 12px; font-family: var(--font-mono); }
 .rh-key { flex-shrink: 0; font-weight: 600; color: var(--brand, #E85D75); }
 .rh-val { color: var(--text-1, #2D2528); word-break: break-all; }
 
@@ -413,7 +413,7 @@ function statusTextClass(c: number): string {
 .modal-ta {
   width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px;
   background: var(--bg-elev, var(--input-bg, rgba(0,0,0,0.02)));
-  color: var(--text-1, #2D2528); font-family: 'JetBrains Mono', ui-monospace, monospace;
+  color: var(--text-1, #2D2528); font-family: var(--font-mono);
   font-size: 13px; line-height: 1.6; resize: vertical; outline: none;
 }
 .modal-ta:focus { border-color: var(--brand, #E85D75); }

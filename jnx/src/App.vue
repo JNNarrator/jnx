@@ -14,11 +14,13 @@ import { useToolsStore } from './stores/tools'
 import { useSettingsStore } from './stores/settings'
 import { useShortcutBindingsStore } from './stores/shortcutBindings'
 import { useAppShortcuts, useCommandPaletteActions } from './composables/useAppShortcuts'
+import { usePlatform } from './composables/usePlatform'
 
 const tools = useToolsStore()
 const settings = useSettingsStore()
 const bindings = useShortcutBindingsStore()
 const osThemeRef = useOsTheme()
+const { isWin } = usePlatform()
 
 const loaded = ref(false)
 
@@ -27,6 +29,7 @@ onMounted(async () => {
     await settings.load()
     await bindings.load()
   } catch (_) { console.warn('后端不可用') }
+  document.documentElement.setAttribute('data-platform', isWin.value ? 'windows' : 'macos')
   try { useCommandPaletteActions() } catch (_) { /* 非组件作用域兜底 */ }
   loaded.value = true
 })
@@ -100,6 +103,14 @@ watchEffect(() => {
   r.setAttribute('data-theme', t === 'system' ? (isOsDark ? 'dark' : 'light') : t)
 })
 
+// ─── Naive UI theme overrides for fonts ───
+const themeOverrides = computed(() => ({
+  common: {
+    fontFamily: "'JetBrains Mono', 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif",
+    fontFamilyMono: "'JetBrains Mono', 'Cascadia Code', 'SF Mono', Menlo, Consolas, monospace",
+  },
+}))
+
 // ─── Naive UI base theme ───
 const naiveTheme = computed(() => {
   const t = settings.values.theme
@@ -115,7 +126,7 @@ const componentMap: Record<string, any> = {
 </script>
 
 <template>
-  <NConfigProvider :theme="naiveTheme">
+  <NConfigProvider :theme="naiveTheme" :theme-overrides="themeOverrides">
     <NMessageProvider>
       <div class="app-shell" :class="{ loaded }">
         <TopBar />
@@ -135,8 +146,8 @@ const componentMap: Record<string, any> = {
 
 <style>
 :root {
-  --font-ui: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', sans-serif;
-  --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', 'Source Code Pro', 'Fira Code', monospace;
+  --font-sans: 'JetBrains Mono', 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Cascadia Code', 'SF Mono', Menlo, Consolas, monospace;
   --color-bg: #FFF5F7;
   --color-surface: #FFFFFF;
   --color-sidebar: #FFFFFF;
@@ -173,9 +184,8 @@ html, body, #app {
   height: 100vh; min-height: 100vh;
   background: var(--color-bg);
   color: var(--color-text-primary);
-  font-family: var(--font-ui);
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+  font-family: var(--font-sans);
+
 }
 
 /* Scrollbar */
@@ -185,6 +195,21 @@ html, body, #app {
 ::-webkit-scrollbar-thumb:hover { background: var(--color-text-tertiary); }
 
 body { overflow: hidden; }
+/* Font smoothing — Windows override via data-platform */
+:root[data-platform='windows'] html,
+:root[data-platform='windows'] body,
+:root[data-platform='windows'] #app {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Code / Mono elements */
+code, pre, textarea, input[type='text'], input[type='search'], .code-area, .mono {
+  font-family: var(--font-mono);
+  font-feature-settings: 'liga' 1, 'calt' 1;
+  line-height: 1.6;
+}
+
 
 /* Layout */
 .app-shell {
