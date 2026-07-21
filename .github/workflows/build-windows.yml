@@ -3,6 +3,7 @@ name: Build (Windows)
 on:
   push:
     branches: [master, main]
+    tags: [v*]
   pull_request:
     branches: [master, main]
   workflow_dispatch:
@@ -53,9 +54,9 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           projectPath: jnx
-          tagName: ${{ github.ref_name }}
-          releaseName: 'jnx ${{ github.ref_name }}'
-          releaseBody: 'See the assets to download this version and install.'
+          tagName: v0.1.${{ github.run_number }}
+          releaseName: 'JNX v0.1.${{ github.run_number }}'
+          releaseBody: 'JNX v0.1.${{ github.run_number }} - see assets to download.'
           releaseDraft: true
           prerelease: false
           args: --target x86_64-pc-windows-msvc

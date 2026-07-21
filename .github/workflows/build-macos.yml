@@ -3,6 +3,7 @@ name: Build (macOS)
 on:
   push:
     branches: [master, main]
+    tags: [v*]
   pull_request:
     branches: [master, main]
   workflow_dispatch:
@@ -45,15 +46,15 @@ jobs:
       - name: Install npm deps
         run: npm ci
 
-      - name: Build Tauri app (macOS)
+      - name: Build Tauri app (macOS arm64)
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           projectPath: jnx
-          tagName: ${{ github.ref_name }}
-          releaseName: 'jnx ${{ github.ref_name }}'
-          releaseBody: 'See the assets to download this version and install.'
+          tagName: v0.1.${{ github.run_number }}
+          releaseName: 'JNX v0.1.${{ github.run_number }}'
+          releaseBody: 'JNX v0.1.${{ github.run_number }} - see assets to download.'
           releaseDraft: true
           prerelease: false
           args: --target aarch64-apple-darwin
@@ -64,9 +65,9 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           projectPath: jnx
-          tagName: ${{ github.ref_name }}
-          releaseName: 'jnx ${{ github.ref_name }}'
-          releaseBody: 'See the assets to download this version and install.'
+          tagName: v0.1.${{ github.run_number }}
+          releaseName: 'JNX v0.1.${{ github.run_number }}'
+          releaseBody: 'JNX v0.1.${{ github.run_number }} - see assets to download.'
           releaseDraft: true
           prerelease: false
           args: --target x86_64-apple-darwin
