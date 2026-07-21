@@ -40,7 +40,7 @@ export function useAppShortcuts() {
 }
 
 function cycleTheme(settings: ReturnType<typeof useSettingsStore>) {
-  const cycle = ['pink', 'light', 'dark', 'system'] as const
+  const cycle = ['light', 'dark'] as const
   const cur = settings.values.theme as typeof cycle[number]
   const next = cycle[(cycle.indexOf(cur) + 1) % cycle.length]
   settings.update('theme', next)
@@ -61,7 +61,6 @@ export function useCommandPaletteActions() {
     { id: 'nav.shortcuts', label: '快捷键',       category: '导航', keywords: ['shortcuts', '快捷键'], action: () => tools.setActiveTab('shortcuts') },
     { id: 'theme.light',   label: '主题：浅色',    category: '动作', keywords: ['theme', 'light', '浅色'], action: () => settings.update('theme', 'light') },
     { id: 'theme.dark',    label: '主题：深色',    category: '动作', keywords: ['theme', 'dark', '深色'], action: () => settings.update('theme', 'dark') },
-    { id: 'theme.pink',    label: '主题：粉色',    category: '动作', keywords: ['theme', 'pink', '粉色'], action: () => settings.update('theme', 'pink') },
-    { id: 'theme.system',  label: '主题：跟随系统', category: '动作', keywords: ['theme', 'system', '系统'], action: () => settings.update('theme', 'system') },
+    { id: 'theme.toggle',  label: '主题：切换',  category: '动作', keywords: ['theme', 'toggle', '切换'], action: () => cycleTheme(settings) },
   ])
 }
