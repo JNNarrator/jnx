@@ -16,7 +16,7 @@ import * as toml from 'smol-toml'
 import { XMLParser, XMLBuilder } from 'fast-xml-parser'
 import Papa from 'papaparse'
 
-export type DataFormat = 'json' | 'yaml' | 'toml' | 'xml' | 'csv'
+export type DataFormat = 'json' | 'yaml' | 'toml' | 'xml' | 'csv' | 'properties'
 
 export type ConvertResult =
   | { ok: true; text: string }
@@ -67,6 +67,14 @@ const SAMPLE_CSV = `name,tools,open
 jnx,5,true
 papa,3,false
 flux,1,true`
+const SAMPLE_PROPERTIES = `# jnx app config
+app.name = jnx
+app.tools = 5
+app.tags[0] = json
+app.tags[1] = yaml
+app.tags[2] = toml
+author = jiangnan
+open = true`
 
 export const FORMAT_META: Record<DataFormat, FormatMeta> = {
   json: { displayName: 'JSON', ext: 'json', sample: SAMPLE_JSON },
@@ -74,6 +82,7 @@ export const FORMAT_META: Record<DataFormat, FormatMeta> = {
   toml: { displayName: 'TOML', ext: 'toml', sample: SAMPLE_TOML },
   xml: { displayName: 'XML', ext: 'xml', sample: SAMPLE_XML },
   csv: { displayName: 'CSV', ext: 'csv', sample: SAMPLE_CSV },
+  properties: { displayName: 'Properties', ext: 'properties', sample: SAMPLE_PROPERTIES },
 }
 
 function asErr(stage: 'parse' | 'stringify', fmt: DataFormat, e: unknown): ConvertResult {
@@ -168,12 +177,86 @@ function flattenOne(o: Record<string, unknown>, prefix = '', acc: Record<string,
   return acc
 }
 
+// ── Properties ── 手写解析器（零依赖）；中间表示为扁平对象（key 含点号路径，不拆嵌套）
+//   支持 # / ! 注释、行尾 \ 续行、= / : / 空白分隔、\n \t \r \f \uXXXX 转义。
+//   parse 丢弃注释；stringify 把嵌套/数组扁平为 a.b / a[0]，注释不还原（固有有损）。
+function parseProperties(text: string): unknown {
+  const result: Record<string, string> = {}
+  const lines = text.split(/\r?\n/)
+  let i = 0
+  while (i < lines.length) {
+    let raw = lines[i]
+    // 续行：行尾单个反斜杠；双反斜杠是字面反斜杠不算续行
+    let safety = 0
+    while (raw.endsWith('\\') && !raw.endsWith('\\\\') && i + 1 < lines.length && safety++ < 1000) {
+      raw = raw.slice(0, -1) + lines[++i].replace(/^[ \t]+/, '')
+    }
+    i++
+    const trimmed = raw.trim()
+    if (!trimmed || trimmed.startsWith('#') || trimmed.startsWith('!')) continue
+    // 分隔区：跳过空白，吞掉一个可选的 = 或 :，再跳空白
+    let kj = 0
+    while (kj < trimmed.length) {
+      const c = trimmed[kj]
+      if (c === '=' || c === ':' || c === ' ' || c === '\t' || c === '\f') break
+      if (c === '\\' && kj + 1 < trimmed.length) { kj += 2; continue }
+      kj++
+    }
+    const key = unescapeProp(trimmed.slice(0, kj).trim())
+    let vj = kj
+    while (vj < trimmed.length && (trimmed[vj] === ' ' || trimmed[vj] === '\t' || trimmed[vj] === '\f')) vj++
+    if (trimmed[vj] === '=' || trimmed[vj] === ':') vj++
+    while (vj < trimmed.length && (trimmed[vj] === ' ' || trimmed[vj] === '\t' || trimmed[vj] === '\f')) vj++
+    const value = unescapeProp(trimmed.slice(vj).trim())
+    if (!key) continue
+    result[key] = value
+  }
+  return result
+}
+function stringifyProperties(obj: unknown): string {
+  if (obj == null) throw new Error('无法序列化空值为 properties')
+  if (Array.isArray(obj)) throw new Error('properties 仅支持键值对对象；数组请先在 JSON 视图转成以数字下标为键的对象')
+  if (typeof obj !== 'object') throw new Error('properties 仅支持键值对对象')
+  const flat: Record<string, string> = {}
+  flattenProps(obj as Record<string, unknown>, '', flat)
+  if (!Object.keys(flat).length) throw new Error('properties 序列化结果为空（无可写键）')
+  return Object.entries(flat)
+    .map(([k, v]) => `${escapePropKey(k)} = ${escapePropValue(v)}`)
+    .join('\n')
+}
+function flattenProps(o: Record<string, unknown>, prefix: string, acc: Record<string, string>): void {
+  for (const [k, v] of Object.entries(o)) {
+    const key = prefix ? `${prefix}.${k}` : k
+    if (v == null) acc[key] = ''
+    else if (Array.isArray(v)) v.forEach((el, idx) => {
+      acc[`${key}[${idx}]`] = el != null && typeof el === 'object' ? JSON.stringify(el) : String(el)
+    })
+    else if (typeof v === 'object') flattenProps(v as Record<string, unknown>, key, acc)
+    else acc[key] = String(v)
+  }
+}
+const PROP_ESC: Record<string, string> = { n: '\n', t: '\t', r: '\r', f: '\f', '\\': '\\', '=': '=', ':': ':', '#': '#', '!': '!', ' ': ' ' }
+function unescapeProp(s: string): string {
+  return s.replace(/\\(u[0-9a-fA-F]{4}|.)/g, (_, g: string) => {
+    if (g[0] === 'u') return String.fromCharCode(parseInt(g.slice(1), 16))
+    return PROP_ESC[g] ?? g
+  })
+}
+function escapePropKey(k: string): string {
+  return k.replace(/[\\=:#! \t]/g, c => '\\' + c)
+}
+function escapePropValue(v: string): string {
+  const m: Record<string, string> = { '\\': '\\\\', '\n': '\\n', '\r': '\\r', '\t': '\\t', '\f': '\\f', '#': '\\#', '!': '\\!' }
+  return v.replace(/[\\\n\r\t\f#!]/g, c => m[c])
+}
+
 type Parser = (text: string) => unknown
 type Serializer = (obj: unknown, opts: { autoFlatten: boolean }) => string
-const PARSERS: Record<DataFormat, Parser> = { json: parseJSON, yaml: parseYAML, toml: parseTOML, xml: parseXML, csv: parseCSV }
+const PARSERS: Record<DataFormat, Parser> = { json: parseJSON, yaml: parseYAML, toml: parseTOML, xml: parseXML, csv: parseCSV, properties: parseProperties }
 const SERIALIZERS: Record<DataFormat, Serializer> = {
   json: (o) => stringifyJSON(o), yaml: (o) => stringifyYAML(o), toml: (o) => stringifyTOML(o),
   xml: (o) => stringifyXML(o), csv: (o, opts) => stringifyCSV(o, opts.autoFlatten),
+  properties: (o) => stringifyProperties(o),
 }
 
 /* 编排：from===to 直接格式化（parse→stringify 同格式重排）；否则 parse 后 stringify */
@@ -191,8 +274,12 @@ export function convert(text: string, from: DataFormat, to: DataFormat, opts: { 
 
 /* 可能「有损」转换的提示，用于 UI 角标非阻断说明 */
 export function lossyHint(from: DataFormat, to: DataFormat): string | undefined {
+  // 转 string 规避 TS 在否定比较后对字面量联合的窄化误判
+  const f = String(from), t = String(to)
+  if (to === 'properties') return 'properties 注释与续行不还原；嵌套/数组会扁平为 a.b / a[0]'
   if (to === 'csv' && from !== 'csv') return 'CSV 仅保留扁平表格；嵌套结构需扁平化'
   if (from === 'xml' && to !== 'xml') return 'XML 属性以 @_ 前缀、文本以 #text 键保留'
   if (to === 'toml' && from !== 'toml') return 'TOML 不支持 null；异构/嵌套数组可能报错'
+  if (f === 'properties' && t !== 'properties') return 'properties 仅扁平 KV；嵌套经点路径还原为字符串'
   return undefined
 }
