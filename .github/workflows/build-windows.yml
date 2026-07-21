@@ -66,6 +66,6 @@ jobs:
         with:
           name: jnx-windows
           path: |
-            jnx/src-tauri/target/release/bundle/**/*.msi
-            jnx/src-tauri/target/release/bundle/**/*.exe
+            jnx/src-tauri/target/x86_64-pc-windows-msvc/release/bundle/**/*.msi
+            jnx/src-tauri/target/x86_64-pc-windows-msvc/release/bundle/**/*.exe
           if-no-files-found: warn

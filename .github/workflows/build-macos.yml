@@ -48,7 +48,8 @@ jobs:
       - name: Install npm deps
         run: npm ci
 
-      - name: Build Tauri app (macOS arm64)
+      # Build universal binary (ARM + Intel) in a single run
+      - name: Build Tauri app (macOS universal)
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -59,26 +60,13 @@ jobs:
           releaseBody: 'JNX v0.1.${{ github.run_number }} - see assets to download.'
           releaseDraft: true
           prerelease: false
-          args: --target aarch64-apple-darwin
-
-      - name: Build Tauri app (macOS x86_64)
-        uses: tauri-apps/tauri-action@v0
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          projectPath: jnx
-          tagName: v0.1.${{ github.run_number }}
-          releaseName: 'JNX v0.1.${{ github.run_number }}'
-          releaseBody: 'JNX v0.1.${{ github.run_number }} - see assets to download.'
-          releaseDraft: true
-          prerelease: false
-          args: --target x86_64-apple-darwin
+          args: --target universal-apple-darwin
 
       - name: Upload macOS artifacts
         uses: actions/upload-artifact@v4
         with:
           name: jnx-macos
           path: |
-            jnx/src-tauri/target/*/release/bundle/**/*.dmg
-            jnx/src-tauri/target/*/release/bundle/**/*.app
+            jnx/src-tauri/target/universal-apple-darwin/release/bundle/**/*.dmg
+            jnx/src-tauri/target/universal-apple-darwin/release/bundle/**/*.app
           if-no-files-found: warn
