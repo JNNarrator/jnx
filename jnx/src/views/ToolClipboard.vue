@@ -94,14 +94,25 @@ function getPreview(text: string): string {
   flex: 1;
   min-height: 0;
   display: flex;
+  flex-direction: column;
 }
 
 .spin-wrap :deep(.n-spin-container) {
   flex: 1;
   min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.spin-wrap :deep(.n-spin-content) {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 .history-list {
+  min-height: 0;
   display: flex;
   flex-direction: column;
   gap: 4px;

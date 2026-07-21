@@ -4,7 +4,7 @@
  * 方向 B：Java 类源码 → 示例 JSON（轻量解析 + 类型→示例值 + 循环引用截断）
  */
 
-import { defineOptions } from 'vue'
+
 import { computed, ref, watch, shallowRef } from 'vue'
 import { NSelect, NSwitch, NButton, NInput, NCollapse, NCollapseItem, useMessage } from 'naive-ui'
 import { useToolDraft } from '../composables/useToolDraft'
@@ -64,7 +64,8 @@ const opts = computed({
 })
 
 /* ─── 输出 ─── */
-const output = shallowRef('')
+/* output 移除：结果直接写入对侧栏 */
+let _skipWatch = false
 const error = shallowRef<string | null>(null)
 const busy = ref(false)
 
@@ -107,7 +108,7 @@ async function doConvert() {
   try {
     if (direction.value === 'json2java') {
       const jsonInput = jsonText.value.trim()
-      if (!jsonInput) { output.value = ''; error.value = null; busy.value = false; return }
+      if (!jsonInput) { error.value = null; busy.value = false; return }
 
       const genOpts: GenOptions = {
         framework: framework.value,
@@ -124,14 +125,13 @@ async function doConvert() {
       const result = jsonToJava(jsonInput, genOpts)
 
       if (result.ok) {
-        output.value = result.code
+        _skipWatch = true; javaText.value = result.code; _skipWatch = false
       } else {
         error.value = result.message
-        output.value = ''
       }
     } else {
       const javaInput = javaText.value.trim()
-      if (!javaInput) { output.value = ''; error.value = null; busy.value = false; return }
+      if (!javaInput) { error.value = null; busy.value = false; return }
 
       const jsonOpts: JavaToJsonOptions = {
         exampleStyle: exampleStyle.value,
@@ -142,15 +142,13 @@ async function doConvert() {
       const result = javaToJson(javaInput, jsonOpts)
 
       if (result.ok) {
-        output.value = result.json
+        _skipWatch = true; jsonText.value = result.json; _skipWatch = false
       } else {
         error.value = result.message
-        output.value = ''
       }
     }
   } catch (e) {
     error.value = `转换异常：${e instanceof Error ? e.message : String(e)}`
-    output.value = ''
   } finally {
     busy.value = false
   }
@@ -170,7 +168,9 @@ function manualConvert() {
 /* ─── Auto-convert watch ─── */
 watch([jsonText, javaText, direction, framework, indentSize, numberStrategy,
        nullStrategy, fieldNaming, nestedMode, rootClassName, packageName,
-       lombok, lombokBuilder, exampleStyle, dateFormat, outputKeyStyle], scheduleConvert, { flush: 'post', deep: false })
+       lombok, lombokBuilder, exampleStyle, dateFormat, outputKeyStyle],
+  () => { if (!_skipWatch) scheduleConvert() },
+  { flush: 'post', deep: false })
 
 /* ─── 操作 ─── */
 
@@ -178,16 +178,11 @@ function swapContent() {
   const tmpJ = jsonText.value
   jsonText.value = javaText.value
   javaText.value = tmpJ
-  // Also swap direction
-  if (output.value) {
-    output.value = ''
-  }
 }
 
 function clearAll() {
   jsonText.value = ''
   javaText.value = ''
-  output.value = ''
   error.value = null
   resetDraft()
 }
@@ -208,10 +203,7 @@ function formatJava() {
   msg.info('已执行轻量缩进规整（非完整 java-format）')
 }
 
-function copyOutput() {
-  if (!output.value) { msg.info('暂无输出可复制'); return }
-  navigator.clipboard.writeText(output.value).then(() => msg.success('已复制')).catch(() => msg.error('复制失败'))
-}
+
 
 /* ─── 填充示例 ─── */
 function fillJsonSample() {
@@ -362,14 +354,7 @@ public class User {
       </div>
     </div>
 
-    <!-- 输出 -->
-    <div v-if="output" class="jb-output">
-      <div class="jb-output-h">
-        <span>输出结果</span>
-        <NButton size="tiny" tertiary @click="copyOutput">复制</NButton>
-      </div>
-      <CodeEditor :model-value="output" language="json" readonly />
-    </div>
+
   </div>
 </template>
 
@@ -401,6 +386,5 @@ public class User {
 .jb-col { display: flex; flex-direction: column; min-height: 0; }
 
 /* Output */
-.jb-output { flex-shrink: 0; max-height: 300px; display: flex; flex-direction: column; gap: 4px; border-top: 1px solid var(--color-border); padding-top: 8px; }
-.jb-output-h { display: flex; align-items: center; justify-content: space-between; font-size: 12px; color: var(--color-text-secondary); }
+
 </style>
