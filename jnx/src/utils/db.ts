@@ -71,3 +71,81 @@ export async function clearClipboardHistory(): Promise<void> {
   const d = await getDb()
   await d.execute('DELETE FROM clipboard_history')
 }
+
+
+// ─── Tool state / drafts ───
+
+let _toolStateInited = false
+
+async function ensureToolStateTable(): Promise<void> {
+  if (_toolStateInited) return
+  const d = await getDb()
+  await d.execute(
+    `CREATE TABLE IF NOT EXISTS tool_state (
+      tool_id    TEXT PRIMARY KEY,
+      payload    TEXT NOT NULL,
+      updated_at INTEGER NOT NULL
+    )`
+  )
+  _toolStateInited = true
+}
+
+export async function loadToolState(toolId: string): Promise<string | null> {
+  try {
+    await ensureToolStateTable()
+    const d = await getDb()
+    const rows = await d.select<{ payload: string }[]>(
+      'SELECT payload FROM tool_state WHERE tool_id = $1',
+      [toolId]
+    )
+    return rows.length > 0 ? rows[0].payload : null
+  } catch (e) {
+    console.warn('[db] loadToolState failed:', toolId, e)
+    return null
+  }
+}
+
+export async function saveToolState(toolId: string, payload: string): Promise<void> {
+  try {
+    await ensureToolStateTable()
+    const d = await getDb()
+    await d.execute(
+      'INSERT INTO tool_state (tool_id, payload, updated_at) VALUES ($1, $2, $3) ' +
+      'ON CONFLICT(tool_id) DO UPDATE SET payload = $2, updated_at = $3',
+      [toolId, payload, Date.now()]
+    )
+  } catch (e) {
+    console.warn('[db] saveToolState failed:', toolId, e)
+  }
+}
+
+export async function clearToolState(toolId: string): Promise<void> {
+  try {
+    await ensureToolStateTable()
+    const d = await getDb()
+    await d.execute('DELETE FROM tool_state WHERE tool_id = $1', [toolId])
+  } catch (e) {
+    console.warn('[db] clearToolState failed:', toolId, e)
+  }
+}
+
+export async function clearAllToolStates(): Promise<void> {
+  try {
+    await ensureToolStateTable()
+    const d = await getDb()
+    await d.execute('DELETE FROM tool_state')
+  } catch (e) {
+    console.warn('[db] clearAllToolStates failed:', e)
+  }
+}
+
+export async function pruneToolStates(maxAgeDays = 30): Promise<void> {
+  try {
+    await ensureToolStateTable()
+    const d = await getDb()
+    const cutoff = Date.now() - maxAgeDays * 24 * 60 * 60 * 1000
+    await d.execute('DELETE FROM tool_state WHERE updated_at < $1', [cutoff])
+  } catch (e) {
+    console.warn('[db] pruneToolStates failed:', e)
+  }
+}

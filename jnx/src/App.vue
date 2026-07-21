@@ -11,6 +11,7 @@ import ToolCurl from './views/ToolCurl.vue'
 import ToolClipboard from './views/ToolClipboard.vue'
 import ToolSettings from './views/ToolSettings.vue'
 import ToolShortcuts from './views/ToolShortcuts.vue'
+import JsonJavabean from './views/JsonJavabean.vue'
 import { useToolsStore } from './stores/tools'
 import { useSettingsStore } from './stores/settings'
 import { useShortcutBindingsStore } from './stores/shortcutBindings'
@@ -113,7 +114,7 @@ const naiveTheme = computed(() => settings.values.theme === 'dark' ? darkTheme :
 
 const componentMap: Record<string, any> = {
   HomeView, ToolJson, ToolCurl, ToolClipboard, ToolSettings, ToolShortcuts,
-  ToolConverter,
+  ToolConverter, JsonJavabean,
 }
 </script>
 
