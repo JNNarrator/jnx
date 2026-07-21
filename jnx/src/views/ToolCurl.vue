@@ -23,8 +23,8 @@ const METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS']
 const methodColors: Record<string, string> = {
   GET: 'var(--info, #3B82F6)', POST: 'var(--success, #2EAB67)',
   PUT: 'var(--warning, #E8A817)', PATCH: 'var(--info, #3B82F6)',
-  DELETE: 'var(--danger, #E84C6F)', HEAD: 'var(--text-3, #8A7A80)',
-  OPTIONS: 'var(--text-3, #8A7A80)',
+  DELETE: 'var(--danger, #E84C6F)', HEAD: 'var(--text-3)',
+  OPTIONS: 'var(--text-3)',
 }
 
 const statusColor = computed(() => {
@@ -288,7 +288,7 @@ function statusTextClass(c: number): string {
   flex: 1; border: none; outline: none; background: transparent;
   font-size: 13px; color: var(--text-1, #2D2528); font-family: inherit;
 }
-.url-input::placeholder { color: var(--text-3, #8A7A80); }
+.url-input::placeholder { color: var(--text-3); }
 
 .btn-primary {
   display: inline-flex; align-items: center; gap: 4px; height: 36px; padding: 0 16px;
@@ -326,7 +326,7 @@ function statusTextClass(c: number): string {
   border-bottom: 1px solid var(--border);
 }
 .card-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.4px; color: var(--text-2, #6A5A60); }
-.card-hint { font-size: 12px; color: var(--text-3, #8A7A80); margin-left: auto; }
+.card-hint { font-size: 12px; color: var(--text-3); margin-left: auto; }
 .card-btn {
   font-size: 11px; padding: 2px 8px; border: 1px solid var(--border); border-radius: 5px;
   background: transparent; color: var(--text-2, #6A5A60); cursor: pointer; font-family: inherit;
@@ -334,7 +334,7 @@ function statusTextClass(c: number): string {
 }
 .card-btn:hover { border-color: var(--brand, #E85D75); color: var(--brand, #E85D75); }
 .card-btn:disabled { opacity: 0.3; cursor: not-allowed; }
-.card-meta { font-size: 11px; color: var(--text-3, #8A7A80); font-variant-numeric: tabular-nums; }
+.card-meta { font-size: 11px; color: var(--text-3); font-variant-numeric: tabular-nums; }
 .card-body { flex: 1; padding: 8px 14px; min-height: 0; overflow-y: auto; }
 .card-body.no-pad { padding: 0; }
 
@@ -345,13 +345,13 @@ function statusTextClass(c: number): string {
   background: transparent; color: var(--text-1, #2D2528);
   font-family: var(--font-mono); font-size: 13px; line-height: 1.6;
 }
-.body-ta::placeholder { color: var(--text-3, #8A7A80); }
+.body-ta::placeholder { color: var(--text-3); }
 .body-ta:disabled { opacity: 0.35; }
 
 /* Empty state */
 .empty { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: 40px 20px; }
 .empty-title { font-size: 14px; font-weight: 600; color: var(--text-2, #6A5A60); }
-.empty-desc { font-size: 13px; color: var(--text-3, #8A7A80); }
+.empty-desc { font-size: 13px; color: var(--text-3); }
 
 /* Response status bar */
 .status-bar {
@@ -369,7 +369,7 @@ function statusTextClass(c: number): string {
 .status-badge.inf { background: rgba(59,130,246,0.12); color: #3B82F6; }
 .status-badge.war { background: rgba(232,168,23,0.12); color: #E8A817; }
 .status-badge.err { background: rgba(232,76,111,0.12); color: #E84C6F; }
-.stat { font-size: 11px; color: var(--text-3, #8A7A80); font-variant-numeric: tabular-nums; }
+.stat { font-size: 11px; color: var(--text-3); font-variant-numeric: tabular-nums; }
 .error-tag { font-size: 10px; padding: 1px 6px; border-radius: 4px; background: rgba(232,76,111,0.1); color: #E84C6F; }
 .err-banner { padding: 8px 14px; font-size: 12px; color: #E84C6F; background: rgba(232,76,111,0.06); border-bottom: 1px solid var(--border); }
 

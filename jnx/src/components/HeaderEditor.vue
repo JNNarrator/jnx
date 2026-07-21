@@ -71,21 +71,21 @@ function remove(i: number) {
   flex: 1; height: 32px; padding: 0 10px; font-size: 13px;
   border: 1px solid var(--border); border-radius: 6px;
   background: var(--bg-elev, var(--input-bg, rgba(0,0,0,0.02)));
-  color: var(--text-1, #F0E2E6); outline: none;
+  color: var(--text-1); outline: none;
   font-family: var(--font-mono);
   transition: border-color 0.15s;
 }
 .hin:focus { border-color: var(--brand, #E85D75); }
 .hin.key { flex: 0 0 160px; }
 .hin.val { flex: 1; }
-.hin::placeholder { color: var(--text-3, #8A7A80); }
+.hin::placeholder { color: var(--text-3); }
 
 .hbtn {
   width: 28px; height: 28px; flex-shrink: 0;
   display: flex; align-items: center; justify-content: center;
   border: 1px solid var(--border); border-radius: 6px;
   background: transparent; cursor: pointer;
-  color: var(--text-2, #B8A6AC); transition: all 0.15s;
+  color: var(--text-2); transition: all 0.15s;
 }
 .hbtn:hover { border-color: var(--brand, #E85D75); color: var(--brand, #E85D75); }
 .hbtn.toggle.off { color: var(--danger, #E84C6F); }

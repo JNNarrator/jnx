@@ -5,6 +5,7 @@ import TopBar from './components/TopBar.vue'
 import Sidebar from './components/Sidebar.vue'
 import CommandPalette from './components/CommandPalette.vue'
 import HomeView from './views/HomeView.vue'
+import ToolConverter from './views/ToolConverter.vue'
 import ToolJson from './views/ToolJson.vue'
 import ToolCurl from './views/ToolCurl.vue'
 import ToolClipboard from './views/ToolClipboard.vue'
@@ -99,6 +100,11 @@ const themeOverrides = computed(() => ({
   common: {
     fontFamily: "'JetBrains Mono', 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif",
     fontFamilyMono: "'JetBrains Mono', 'Cascadia Code', 'SF Mono', Menlo, Consolas, monospace",
+    // 与本应用文本色阶对齐，避免控件内文字与外层割裂；light/dark 两套都覆盖
+    textColor1: settings.values.theme === 'dark' ? '#E4E4E7' : '#2D2528',
+    textColor2: settings.values.theme === 'dark' ? '#A1A1AA' : '#555555',
+    textColor3: settings.values.theme === 'dark' ? '#71717A' : '#777777',
+    placeholderColor: settings.values.theme === 'dark' ? '#71717A' : '#777777',
   },
 }))
 
@@ -107,6 +113,7 @@ const naiveTheme = computed(() => settings.values.theme === 'dark' ? darkTheme :
 
 const componentMap: Record<string, any> = {
   HomeView, ToolJson, ToolCurl, ToolClipboard, ToolSettings, ToolShortcuts,
+  ToolConverter,
 }
 </script>
 

@@ -34,7 +34,7 @@ function save(key: string, value: string | number) {
       </div>
     </div>
 
-    <NDivider style="border-color: rgba(255, 140, 158, 0.1)" />
+    <NDivider :style="{ '--n-color': 'var(--color-border)' }" />
 
     <div class="settings-section">
       <h3>标签栏</h3>
@@ -62,7 +62,7 @@ function save(key: string, value: string | number) {
       </div>
     </div>
 
-    <NDivider style="border-color: rgba(255, 140, 158, 0.1)" />
+    <NDivider :style="{ '--n-color': 'var(--color-border)' }" />
 
     <div class="settings-section">
       <h3>剪贴板</h3>
@@ -93,15 +93,15 @@ function save(key: string, value: string | number) {
 .tool-header h2 {
   margin: 0 0 16px 0;
   font-size: 16px;
-  font-weight: 600;
-  color: #F0E2E6;
+  font-weight: 700;
+  color: var(--color-text-primary);
 }
 
 .settings-section h3 {
   margin: 0 0 12px 0;
   font-size: 14px;
-  font-weight: 500;
-  color: #B8A6AC;
+  font-weight: 600;
+  color: var(--color-text-primary);
 }
 
 .setting-row {
@@ -113,12 +113,12 @@ function save(key: string, value: string | number) {
 
 .setting-row label {
   font-size: 14px;
-  color: #F0E2E6;
+  color: var(--color-text-primary);
 }
 
 .setting-hint {
   font-size: 12px;
-  color: #B8A6AC;
+  color: var(--color-text-secondary);
   margin: 4px 0 0;
 }
 </style>

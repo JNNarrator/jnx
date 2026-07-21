@@ -52,6 +52,7 @@ export const HOME_TAB: ToolTab = {
 
 export const ALL_TOOLS: ToolTab[] = [
   { id: 'json', label: 'JSON 工具', icon: 'brackets', component: 'ToolJson', pinned: true, desc: 'JSON 格式化、校验与树形浏览' },
+  { id: 'converter', label: '格式互转', icon: 'convert', component: 'ToolConverter', pinned: true, desc: 'JSON / YAML / TOML / XML / CSV 互转' },
   { id: 'curl', label: 'HTTP 请求', icon: 'terminal', component: 'ToolCurl', pinned: true, desc: '构造与发送 HTTP 请求' },
   { id: 'clipboard', label: '剪贴板', icon: 'clipboard', component: 'ToolClipboard', pinned: true, desc: '剪贴板历史记录' },
   { id: 'settings', label: '设置', icon: 'settings', component: 'ToolSettings', pinned: true, desc: '应用偏好设置' },

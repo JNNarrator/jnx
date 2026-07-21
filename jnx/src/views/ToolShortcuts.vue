@@ -124,21 +124,21 @@ function resetAll() {
 <style scoped>
 .panel { padding: 20px 24px; height: 100%; display: flex; flex-direction: column; overflow: hidden; }
 .panel-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; flex-shrink: 0; }
-.panel-header h2 { margin: 0; font-size: 16px; font-weight: 700; color: var(--color-text-primary, #F0E2E6); }
+.panel-header h2 { margin: 0; font-size: 16px; font-weight: 700; color: var(--color-text-primary); }
 .header-actions { display: flex; align-items: center; gap: 10px; }
-.hint { margin: 0 0 14px; font-size: 12px; color: var(--color-text-tertiary, #8A7A80); }
+.hint { margin: 0 0 14px; font-size: 12px; color: var(--color-text-secondary); }
 .search {
   background: var(--color-input-bg, rgba(255,255,255,0.04));
   border: 1px solid var(--color-border, rgba(255,140,158,0.12));
   border-radius: 8px; padding: 6px 12px; font-size: 13px;
-  color: var(--color-text-primary, #F0E2E6); outline: none; width: 200px; font-family: inherit;
+  color: var(--color-text-primary); outline: none; width: 200px; font-family: inherit;
 }
 .search:focus { border-color: var(--color-accent, #E85D75); }
-.search::placeholder { color: var(--color-text-tertiary, #8A7A80); }
+.search::placeholder { color: var(--color-text-tertiary); }
 .groups { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 20px; }
-.gt { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--color-text-tertiary, #8A7A80); margin: 0 0 10px; }
+.gt { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--color-text-tertiary); margin: 0 0 10px; }
 .row { display: flex; align-items: center; justify-content: space-between; padding: 6px 0; gap: 12px; }
-.label { font-size: 14px; color: var(--color-text-primary, #F0E2E6); }
+.label { font-size: 14px; color: var(--color-text-primary); }
 .binding { display: flex; align-items: center; gap: 8px; }
 .kbd-btn { background: none; border: none; padding: 2px 4px; cursor: pointer; border-radius: 6px; }
 .kbd-btn:hover { background: var(--color-card-hover, rgba(255,140,158,0.06)); }

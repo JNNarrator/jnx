@@ -24,6 +24,7 @@ export function useAppShortcuts() {
   useKeyboardShortcut('nav.toClipboard',    () => tools.setActiveTab('clipboard'))
   useKeyboardShortcut('nav.toSettings',     () => tools.setActiveTab('settings'))
   useKeyboardShortcut('nav.toShortcuts',    () => tools.setActiveTab('shortcuts'))
+  useKeyboardShortcut('nav.toConverter',    () => tools.setActiveTab('converter'))
   useKeyboardShortcut('theme.cycle',        () => cycleTheme(settings))
 
   /* 当用户在设置页改了绑定，把新 chord 注入到已注册的 entry */
@@ -56,6 +57,7 @@ export function useCommandPaletteActions() {
     { id: 'nav.home',      label: '返回首页',    category: '导航', keywords: ['home', '首页'], action: () => tools.setActiveTab('home') },
     { id: 'nav.json',      label: 'JSON 工具',   category: '导航', keywords: ['json', '格式化'], action: () => tools.setActiveTab('json') },
     { id: 'nav.http',      label: 'HTTP 请求',    category: '导航', keywords: ['http', 'curl', '请求'], action: () => tools.setActiveTab('curl') },
+    { id: 'nav.converter', label: '格式互转',     category: '导航', keywords: ['converter', '格式', '转换', 'yaml', 'toml', 'xml', 'csv'], action: () => tools.setActiveTab('converter') },
     { id: 'nav.clipboard', label: '剪贴板',       category: '导航', keywords: ['clipboard', '剪贴板'], action: () => tools.setActiveTab('clipboard') },
     { id: 'nav.settings',  label: '设置',         category: '导航', keywords: ['settings', '设置'], action: () => tools.setActiveTab('settings') },
     { id: 'nav.shortcuts', label: '快捷键',       category: '导航', keywords: ['shortcuts', '快捷键'], action: () => tools.setActiveTab('shortcuts') },

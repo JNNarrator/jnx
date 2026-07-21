@@ -10,7 +10,7 @@ const tools = useToolsStore()
 const toolCards = ALL_TOOLS.map(t => ({
   id: t.id,
   label: t.label,
-  iconKey: t.icon === 'brackets' ? 'brackets' : t.icon === 'terminal' ? 'terminal' : t.icon === 'clipboard' ? 'clipboard' : 'settings',
+  iconKey: t.icon === 'brackets' ? 'brackets' : t.icon === 'terminal' ? 'terminal' : t.icon === 'clipboard' ? 'clipboard' : t.icon === 'convert' ? 'convert' : 'settings',
   desc: t.desc || '',
 }))
 

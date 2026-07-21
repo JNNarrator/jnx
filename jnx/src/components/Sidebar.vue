@@ -10,6 +10,7 @@ const sidebarCollapsed = ref(false)
 const navItems = [
   { id: 'home', label: '首页', iconKey: 'home' },
   { id: 'json', label: 'JSON 工具', iconKey: 'brackets' },
+  { id: 'converter', label: '格式互转', iconKey: 'convert' },
   { id: 'curl', label: 'HTTP 请求', iconKey: 'terminal' },
   { id: 'clipboard', label: '剪贴板', iconKey: 'clipboard' },
   { id: 'settings', label: '设置', iconKey: 'settings' },
