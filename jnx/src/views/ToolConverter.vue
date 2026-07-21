@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, shallowRef, watch } from 'vue'
-import { NSelect, NSwitch, NButton, NInput, useMessage } from 'naive-ui'
+import { NSelect, NSwitch, NButton, useMessage } from 'naive-ui'
+import CodeEditor from '../components/CodeEditor.vue'
 import { convert, FORMAT_META, lossyHint, type ConvertResult, type DataFormat } from '../utils/converter'
 
 const msg = useMessage()
@@ -72,116 +73,6 @@ function errText(e: ConvertResult): string {
  return ''
 }
 
-// --- Editor input key handlers (element-level @keydown, not useKeyboardShortcut) ---
-const INDENT = "  "
-
-const inputRef = ref<InstanceType<typeof NInput> | null>(null)
-
-function getTextarea(): HTMLTextAreaElement | null {
-  return inputRef.value?.$el?.querySelector?.("textarea") ?? null
-}
-
-function getLineRange(text: string, start: number, end: number): { lineStart: number; lineEnd: number } {
-  const lineStart = text.lastIndexOf("\n", start > 0 ? start - 1 : 0) + 1
-  if (end <= lineStart) return { lineStart, lineEnd: lineStart }
-  if (text[end - 1] === "\n") return { lineStart, lineEnd: end }
-  const nextNl = text.indexOf("\n", end)
-  return { lineStart, lineEnd: nextNl === -1 ? text.length : nextNl + 1 }
-}
-
-function getAutoIndent(prevLine: string): string {
-  const trimmed = prevLine.trim()
-  if (!trimmed) return ""
-  const leading = prevLine.match(/^(\s*)/)?.[1] ?? ""
-  if (/:\s*$/.test(trimmed)) return leading + INDENT
-  if (/^-\s/.test(trimmed) || trimmed === "-") return leading + INDENT
-  return leading
-}
-
-function safeReplace(el: HTMLTextAreaElement, start: number, end: number, text: string): void {
-  el.setSelectionRange(start, end)
-  if (document.execCommand("insertText", false, text)) return
-  el.value = el.value.slice(0, start) + text + el.value.slice(end)
-  const newPos = start + text.length
-  el.selectionStart = el.selectionEnd = newPos
-  el.dispatchEvent(new Event("input", { bubbles: true }))
-}
-
-function blockIndent(el: HTMLTextAreaElement, start: number, end: number): void {
-  const text = el.value
-  const { lineStart, lineEnd } = getLineRange(text, start, end)
-  if (lineEnd <= lineStart) return
-  const indented = text.slice(lineStart, lineEnd).split("\n").map(l => INDENT + l).join("\n")
-  el.setSelectionRange(lineStart, lineEnd)
-  if (!document.execCommand("insertText", false, indented)) {
-    el.value = text.slice(0, lineStart) + indented + text.slice(lineEnd)
-    el.dispatchEvent(new Event("input", { bubbles: true }))
-  }
-  el.selectionStart = lineStart
-  el.selectionEnd = lineStart + indented.length
-}
-
-function blockOutdent(el: HTMLTextAreaElement, start: number, end: number): void {
-  const text = el.value
-  const { lineStart, lineEnd } = getLineRange(text, start, end)
-  if (lineEnd <= lineStart) return
-  const outdented = text.slice(lineStart, lineEnd).split("\n").map(l => {
-    if (l.startsWith(INDENT)) return l.slice(INDENT.length)
-    if (l.startsWith(" ")) return l.slice(1)
-    return l
-  }).join("\n")
-  el.setSelectionRange(lineStart, lineEnd)
-  if (!document.execCommand("insertText", false, outdented)) {
-    el.value = text.slice(0, lineStart) + outdented + text.slice(lineEnd)
-    el.dispatchEvent(new Event("input", { bubbles: true }))
-  }
-  el.selectionStart = lineStart
-  el.selectionEnd = lineStart + outdented.length
-}
-
-function onEditorKeydown(e: KeyboardEvent): void {
-  const el = getTextarea()
-  if (!el) return
-
-  const { key, shiftKey, ctrlKey, metaKey, altKey } = e
-
-  // Tab: insert INDENT (collapsed) / block-indent (selection) / block-outdent (Shift+Tab)
-  if (key === "Tab" && !ctrlKey && !metaKey && !altKey) {
-    e.preventDefault()
-    const { selectionStart: start, selectionEnd: end } = el
-    if (shiftKey) {
-      blockOutdent(el, start, end)
-    } else if (start === end) {
-      safeReplace(el, start, end, INDENT)
-    } else {
-      blockIndent(el, start, end)
-    }
-    return
-  }
-
-  // Enter: auto-indent; Shift+Enter: plain newline
-  if (key === "Enter" && !ctrlKey && !metaKey && !altKey) {
-    e.preventDefault()
-    const text = el.value
-    const cursor = el.selectionStart
-    const selStart = el.selectionStart
-    const selEnd = el.selectionEnd
-
-    if (shiftKey) {
-      safeReplace(el, selStart, selEnd, "\n")
-      return
-    }
-
-    // Current line content for auto-indent calculation
-    const lineStart = text.lastIndexOf("\n", cursor > 0 ? cursor - 1 : 0) + 1
-    const lineEndIdx = text.indexOf("\n", cursor)
-    const currentLine = text.slice(lineStart, lineEndIdx === -1 ? text.length : lineEndIdx)
-    const indent = getAutoIndent(currentLine)
-
-    safeReplace(el, selStart, selEnd, "\n" + indent)
-  }
-}
-
 </script>
 
 <template>
@@ -211,7 +102,7 @@ function onEditorKeydown(e: KeyboardEvent): void {
           <span>输入 · {{ FORMAT_META[fromFmt].displayName }}</span>
           <span class="cv-meta">{{ inputCount }} 字符</span>
         </div>
-        <NInput ref="inputRef" v-model:value="input" type="textarea" :rows="20" class="cv-ta" placeholder="粘贴或在此输入…" @keydown="onEditorKeydown" />
+        <CodeEditor v-model="input" :language="fromFmt" placeholder="粘贴或在此输入…" />
         <div v-if="parseErr" class="cv-err">{{ errText(parseErr!) }}</div>
       </div>
       <div class="cv-col">
@@ -222,7 +113,7 @@ function onEditorKeydown(e: KeyboardEvent): void {
             {{ elapsed }} ms
           </span>
         </div>
-        <NInput :value="output" type="textarea" :rows="20" readonly class="cv-ta" placeholder="转换结果…" />
+        <CodeEditor :model-value="output" :language="toFmt" readonly placeholder="转换结果…" />
         <div v-if="stringifyErr" class="cv-err">{{ errText(stringifyErr!) }}</div>
       </div>
     </div>
@@ -248,7 +139,6 @@ function onEditorKeydown(e: KeyboardEvent): void {
 .cv-col-h { display: flex; align-items: center; justify-content: space-between; font-size: 12px;
   color: var(--color-text-secondary); padding: 0 2px; }
 .cv-meta { display: inline-flex; align-items: center; gap: 8px; font-size: 11px; color: var(--color-text-tertiary); }
-.cv-ta :deep(textarea) { font-family: var(--font-mono); font-size: 13px; line-height: 1.6; }
 .cv-err { font-size: 12px; color: var(--danger); padding: 6px 10px;
   background: rgba(232,76,111,0.08); border-radius: 8px; }
 </style>

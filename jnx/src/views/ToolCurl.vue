@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, reactive, watch } from 'vue'
 import { useMessage } from 'naive-ui'
 import { useHttpStore } from '../stores/http'
 import { useHttpSend } from '../composables/useHttpSend'
 import { useLegacyShortcut } from '../composables/useKeyboardShortcut'
 import { parseCurl } from '../utils/parseCurl'
 import Kbd from '../components/Kbd.vue'
+import CodeEditor from '../components/CodeEditor.vue'
 import HeaderEditor from '../components/HeaderEditor.vue'
 
 const store = useHttpStore()
@@ -21,19 +22,19 @@ const dragOver = ref(false)
 const METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS']
 
 const methodColors: Record<string, string> = {
-  GET: 'var(--info, #3B82F6)', POST: 'var(--success, #2EAB67)',
-  PUT: 'var(--warning, #E8A817)', PATCH: 'var(--info, #3B82F6)',
-  DELETE: 'var(--danger, #E84C6F)', HEAD: 'var(--text-3)',
+  GET: 'var(--info)', POST: 'var(--success)',
+  PUT: 'var(--warning)', PATCH: 'var(--info)',
+  DELETE: 'var(--danger)', HEAD: 'var(--text-3)',
   OPTIONS: 'var(--text-3)',
 }
 
 const statusColor = computed(() => {
   if (!store.response) return ''
   const s = store.response.status
-  if (s >= 200 && s < 300) return 'var(--success, #2EAB67)'
-  if (s >= 300 && s < 400) return 'var(--info, #3B82F6)'
-  if (s >= 400 && s < 500) return 'var(--warning, #E8A817)'
-  return 'var(--danger, #E84C6F)'
+  if (s >= 200 && s < 300) return 'var(--success)'
+  if (s >= 300 && s < 400) return 'var(--info)'
+  if (s >= 400 && s < 500) return 'var(--warning)'
+  return 'var(--danger)'
 })
 
 const responseSize = computed(() => {
@@ -122,6 +123,33 @@ function statusTextClass(c: number): string {
   if (c >= 400 && c < 500) return 'war'
   return 'err'
 }
+const activeHeaderCount = computed(() =>
+  store.request.headers.filter(h => h.enabled && h.key.trim()).length
+)
+const responseBodyLang = computed(() => {
+  if (!store.response) return 'json'
+  const ct = (store.response.headers['content-type'] || store.response.headers['Content-Type'] || '').toLowerCase()
+  if (ct.includes('json')) return 'json'
+  if (ct.includes('xml')) return 'xml'
+  return 'plaintext'
+})
+
+const FOLD_KEY = 'http-tool.foldState'
+function loadFoldState() {
+  try {
+    const saved = localStorage.getItem(FOLD_KEY)
+    if (saved) return JSON.parse(saved)
+  } catch {}
+  return { headers: false, body: true }
+}
+const foldState = reactive(loadFoldState())
+watch(foldState, (val) => {
+  localStorage.setItem(FOLD_KEY, JSON.stringify(val))
+}, { deep: true })
+function toggleFold(name: 'headers' | 'body') {
+  foldState[name] = !foldState[name]
+}
+
 </script>
 
 <template>
@@ -160,30 +188,34 @@ function statusTextClass(c: number): string {
       <!-- Left: Request -->
       <div class="req-col">
         <div class="card">
-          <div class="card-header">
+          <div class="card-header foldable" @click="toggleFold('headers')">
             <span class="card-label">请求头</span>
+            <span v-if="activeHeaderCount" class="fold-badge">{{ activeHeaderCount }}</span>
+            <span v-else class="fold-badge empty">0</span>
+            <svg :class="['chevron', { open: foldState.headers }]" viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 6l4 4 4-4"/></svg>
           </div>
-          <div class="card-body no-pad">
+          <div v-show="foldState.headers" class="card-body no-pad">
             <HeaderEditor v-model:headers="store.request.headers" />
           </div>
         </div>
         <div class="card">
-          <div class="card-header">
+          <div class="card-header foldable" @click="toggleFold('body')">
             <span class="card-label">请求体</span>
             <span v-if="['GET','HEAD'].includes(store.request.method)" class="card-hint">GET/HEAD 无请求体</span>
             <template v-else>
-              <button class="card-btn" @click="store.request.body = JSON.stringify(JSON.parse(store.request.body || '{}'), null, 2)" :disabled="!store.request.body">格式化 JSON</button>
-              <button class="card-btn" @click="store.request.body = ''">清空</button>
+              <button class="card-btn" @click.stop="store.request.body = JSON.stringify(JSON.parse(store.request.body || '{}'), null, 2)" :disabled="!store.request.body">格式化 JSON</button>
+              <button class="card-btn" @click.stop="store.request.body = ''">清空</button>
               <span class="card-meta">{{ store.request.body.length }} 字符</span>
             </template>
+            <svg :class="['chevron', { open: foldState.body }]" viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 6l4 4 4-4"/></svg>
           </div>
-          <div class="card-body">
-            <textarea v-if="!['GET','HEAD'].includes(store.request.method)"
+          <div v-show="foldState.body" class="card-body no-pad" style="overflow: hidden">
+            <CodeEditor v-if="!['GET','HEAD'].includes(store.request.method)"
               v-model="store.request.body"
-              class="body-ta"
+              language="json"
               placeholder='{"key": "value"}'
-              :disabled="['GET','HEAD'].includes(store.request.method)"
-            ></textarea>
+              :readonly="['GET','HEAD'].includes(store.request.method)"
+              :min-height="'80px'" />
           </div>
         </div>
       </div>
@@ -200,8 +232,8 @@ function statusTextClass(c: number): string {
             <svg width="48" height="48" viewBox="0 0 48 48" fill="none" stroke="var(--text-3)" stroke-width="1" opacity="0.35">
               <path d="M10 18h28M10 26h20M10 34h14"/><rect x="6" y="6" width="36" height="36" rx="4"/>
             </svg>
-            <div class="empty-title">等待请求</div>
-            <div class="empty-desc">填写 URL 后点击「发送」</div>
+            <div class="empty-title">发送请求后，响应将显示于此</div>
+            <div class="empty-desc">支持查看状态码、响应头、响应体及耗时</div>
           </div>
 
           <template v-else>
@@ -232,8 +264,14 @@ function statusTextClass(c: number): string {
 
             <!-- Tab content -->
             <div class="tab-content">
-              <pre v-if="responseTab === 'pretty'" class="res-pre">{{ prettyBody }}</pre>
-              <pre v-else-if="responseTab === 'raw'" class="res-pre">{{ store.response.body }}</pre>
+              <div v-if="responseTab === 'pretty' || responseTab === 'raw'" class="code-editor-resp">
+                <CodeEditor
+                  :model-value="responseTab === 'pretty' ? prettyBody : store.response.body"
+                  :language="responseBodyLang"
+                  readonly
+                  :line-numbers="true"
+                />
+              </div>
               <div v-else class="res-headers">
                 <div v-for="h in resHeaders" :key="h.k" class="rh-row">
                   <span class="rh-key">{{ h.k }}</span>
@@ -266,34 +304,34 @@ function statusTextClass(c: number): string {
 
 <style scoped>
 .http-tool { height: 100%; display: flex; flex-direction: column; gap: 8px; padding: 12px 16px; }
-.http-tool.drag-over { outline: 2px dashed var(--brand, #E85D75); outline-offset: -4px; border-radius: 8px; background: var(--hover, rgba(232,76,111,0.03)); }
+.http-tool.drag-over { outline: 2px dashed var(--brand); outline-offset: -4px; border-radius: 8px; background: var(--hover); }
 
 /* ─── Toolbar ─── */
 .toolbar { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
 .method-sel {
   height: 36px; padding: 0 10px; border: 1px solid var(--border); border-radius: 8px;
-  background: var(--bg-card, #FFF); color: var(--text-1, #2D2528); font-size: 13px;
+  background: var(--bg-card); color: var(--text-1); font-size: 13px;
   font-weight: 600; cursor: pointer; outline: none; font-family: inherit;
 }
 .url-wrap {
   flex: 1; display: flex; align-items: center; gap: 8px;
   height: 36px; padding: 0 12px;
   border: 1px solid var(--border); border-radius: 8px;
-  background: var(--bg-elev, var(--input-bg, rgba(0,0,0,0.02)));
+  background: var(--bg-elev);
   transition: border-color 0.15s;
 }
-.url-wrap:focus-within { border-color: var(--brand, #E85D75); }
+.url-wrap:focus-within { border-color: var(--brand); }
 .method-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
 .url-input {
   flex: 1; border: none; outline: none; background: transparent;
-  font-size: 13px; color: var(--text-1, #2D2528); font-family: inherit;
+  font-size: 13px; color: var(--text-1); font-family: inherit;
 }
 .url-input::placeholder { color: var(--text-3); }
 
 .btn-primary {
   display: inline-flex; align-items: center; gap: 4px; height: 36px; padding: 0 16px;
   border: none; border-radius: 8px;
-  background: linear-gradient(135deg, var(--brand, #E85D75), var(--brand-hover, #FF8C9E));
+  background: linear-gradient(135deg, var(--brand), var(--color-accent-light));
   color: #FFF; font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit;
   white-space: nowrap; transition: box-shadow 0.15s, transform 0.1s;
 }
@@ -305,10 +343,10 @@ function statusTextClass(c: number): string {
 .btn-ghost {
   display: inline-flex; align-items: center; gap: 4px; height: 36px; padding: 0 12px;
   border: 1px solid var(--border); border-radius: 8px;
-  background: var(--bg-card, #FFF); color: var(--text-2, #6A5A60);
+  background: var(--bg-card); color: var(--text-2);
   font-size: 13px; cursor: pointer; font-family: inherit; transition: all 0.15s;
 }
-.btn-ghost:hover { border-color: var(--brand, #E85D75); color: var(--brand, #E85D75); }
+.btn-ghost:hover { border-color: var(--brand); color: var(--brand); }
 
 /* ─── Grid ─── */
 .grid { flex: 1; display: grid; grid-template-columns: 1fr 1fr; gap: 12px; min-height: 0; }
@@ -317,7 +355,7 @@ function statusTextClass(c: number): string {
 .card {
   display: flex; flex-direction: column;
   border: 1px solid var(--border); border-radius: 10px;
-  background: var(--bg-card, #FFF);
+  background: var(--bg-card);
   overflow: hidden;
 }
 .card-header {
@@ -325,32 +363,24 @@ function statusTextClass(c: number): string {
   padding: 8px 14px; flex-shrink: 0;
   border-bottom: 1px solid var(--border);
 }
-.card-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.4px; color: var(--text-2, #6A5A60); }
+.card-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.4px; color: var(--text-2); }
 .card-hint { font-size: 12px; color: var(--text-3); margin-left: auto; }
 .card-btn {
   font-size: 11px; padding: 2px 8px; border: 1px solid var(--border); border-radius: 5px;
-  background: transparent; color: var(--text-2, #6A5A60); cursor: pointer; font-family: inherit;
+  background: transparent; color: var(--text-2); cursor: pointer; font-family: inherit;
   transition: all 0.15s;
 }
-.card-btn:hover { border-color: var(--brand, #E85D75); color: var(--brand, #E85D75); }
+.card-btn:hover { border-color: var(--brand); color: var(--brand); }
 .card-btn:disabled { opacity: 0.3; cursor: not-allowed; }
 .card-meta { font-size: 11px; color: var(--text-3); font-variant-numeric: tabular-nums; }
 .card-body { flex: 1; padding: 8px 14px; min-height: 0; overflow-y: auto; }
-.card-body.no-pad { padding: 0; }
+.card-body.no-pad { padding: 0; overflow: hidden; }
 
-/* Body textarea */
-.body-ta {
-  width: 100%; height: 100%; min-height: 60px;
-  border: none; outline: none; resize: vertical;
-  background: transparent; color: var(--text-1, #2D2528);
-  font-family: var(--font-mono); font-size: 13px; line-height: 1.6;
-}
-.body-ta::placeholder { color: var(--text-3); }
-.body-ta:disabled { opacity: 0.35; }
+
 
 /* Empty state */
 .empty { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: 40px 20px; }
-.empty-title { font-size: 14px; font-weight: 600; color: var(--text-2, #6A5A60); }
+.empty-title { font-size: 14px; font-weight: 600; color: var(--text-2); }
 .empty-desc { font-size: 13px; color: var(--text-3); }
 
 /* Response status bar */
@@ -377,26 +407,26 @@ function statusTextClass(c: number): string {
 .tab-bar { display: flex; border-bottom: 1px solid var(--border); flex-shrink: 0; padding: 0 14px; }
 .tab {
   padding: 8px 14px; font-size: 12px; font-weight: 500;
-  border: none; background: transparent; color: var(--text-2, #6A5A60);
+  border: none; background: transparent; color: var(--text-2);
   cursor: pointer; position: relative; font-family: inherit;
   transition: color 0.15s;
 }
-.tab:hover { color: var(--text-1, #2D2528); }
-.tab.active { color: var(--brand, #E85D75); }
+.tab:hover { color: var(--text-1); }
+.tab.active { color: var(--brand); }
 .tab.active::after {
   content: ''; position: absolute; bottom: 0; left: 14px; right: 14px;
-  height: 2px; background: var(--brand, #E85D75); border-radius: 2px;
+  height: 2px; background: var(--brand); border-radius: 2px;
 }
 .tab-content { flex: 1; overflow-y: auto; }
 .res-pre {
   margin: 0; padding: 12px 14px; white-space: pre-wrap; word-break: break-all;
   font-family: var(--font-mono); font-size: 12px; line-height: 1.6;
-  color: var(--text-1, #2D2528);
+  color: var(--text-1);
 }
 .res-headers { padding: 8px 14px; }
 .rh-row { display: flex; gap: 12px; padding: 4px 0; font-size: 12px; font-family: var(--font-mono); }
-.rh-key { flex-shrink: 0; font-weight: 600; color: var(--brand, #E85D75); }
-.rh-val { color: var(--text-1, #2D2528); word-break: break-all; }
+.rh-key { flex-shrink: 0; font-weight: 600; color: var(--brand); }
+.rh-val { color: var(--text-1); word-break: break-all; }
 
 /* ─── cURL Import Modal ─── */
 .modal-overlay {
@@ -406,17 +436,60 @@ function statusTextClass(c: number): string {
 }
 .modal-panel {
   width: 540px; max-width: 90vw; padding: 24px;
-  background: var(--bg-card, #FFF); border-radius: 14px;
+  background: var(--bg-card); border-radius: 14px;
   box-shadow: 0 20px 60px rgba(0,0,0,0.2);
 }
-.modal-title { margin: 0 0 14px; font-size: 16px; font-weight: 700; color: var(--text-1, #2D2528); }
+.modal-title { margin: 0 0 14px; font-size: 16px; font-weight: 700; color: var(--text-1); }
 .modal-ta {
   width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px;
-  background: var(--bg-elev, var(--input-bg, rgba(0,0,0,0.02)));
-  color: var(--text-1, #2D2528); font-family: var(--font-mono);
+  background: var(--bg-elev);
+  color: var(--text-1); font-family: var(--font-mono);
   font-size: 13px; line-height: 1.6; resize: vertical; outline: none;
 }
-.modal-ta:focus { border-color: var(--brand, #E85D75); }
-.modal-err { font-size: 13px; color: var(--danger, #E84C6F); margin-top: 8px; }
+.modal-ta:focus { border-color: var(--brand); }
+.modal-err { font-size: 13px; color: var(--danger); margin-top: 8px; }
 .modal-actions { display: flex; gap: 8px; margin-top: 14px; justify-content: flex-end; }
+
+/* ─── Foldable card ─── */
+.card-header.foldable {
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.15s;
+}
+.card-header.foldable:hover {
+  background: var(--color-card-hover);
+}
+.chevron {
+  flex-shrink: 0;
+  transition: transform 0.2s;
+  color: var(--color-text-tertiary);
+}
+.chevron.open {
+  transform: rotate(180deg);
+}
+.fold-badge {
+  font-size: 11px;
+  padding: 0 7px;
+  height: 18px;
+  display: inline-flex;
+  align-items: center;
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--color-accent) 12%, transparent);
+  color: var(--color-accent);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.fold-badge.empty {
+  opacity: 0.4;
+  background: var(--color-border);
+  color: var(--color-text-tertiary);
+}
+/* CodeEditor in response */
+.code-editor-resp {
+  height: 100%;
+  min-height: 100px;
+  display: flex;
+  flex-direction: column;
+}
+
 </style>

@@ -1,5 +1,5 @@
 {
-  "name": "JNX",
+  "name": "jnx",
   "private": true,
   "version": "0.1.0",
   "type": "module",
@@ -7,9 +7,7 @@
     "dev": "vite",
     "build": "vue-tsc --noEmit && vite build",
     "preview": "vite preview",
-    "tauri": "tauri",
-    "check:text-colors": "grep -nE \"color:.*var\\(--[a-zA-Z-]+,\" src/ --include=\"*.vue\" --include=\"*.ts\" | grep -v \"node_modules\" | grep -E \"#\" | head -30 || echo \"No hardcoded fallback colors found\"",
-    "check:all-hex": "grep -rnE \"var\\(--[a-zA-Z-]+,\\s*(#|rgba)\" src/ --include=\"*.vue\" --include=\"*.ts\" 2>/dev/null | grep -v node_modules | head -30 || echo \"No hardcoded hex/rgba fallbacks found\""
+    "tauri": "tauri"
   },
   "dependencies": {
     "@tauri-apps/api": "^2",

@@ -70,12 +70,12 @@ function remove(i: number) {
 .hin {
   flex: 1; height: 32px; padding: 0 10px; font-size: 13px;
   border: 1px solid var(--border); border-radius: 6px;
-  background: var(--bg-elev, var(--input-bg, rgba(0,0,0,0.02)));
+  background: var(--bg-elev);
   color: var(--text-1); outline: none;
   font-family: var(--font-mono);
   transition: border-color 0.15s;
 }
-.hin:focus { border-color: var(--brand, #E85D75); }
+.hin:focus { border-color: var(--brand); }
 .hin.key { flex: 0 0 160px; }
 .hin.val { flex: 1; }
 .hin::placeholder { color: var(--text-3); }
@@ -87,7 +87,7 @@ function remove(i: number) {
   background: transparent; cursor: pointer;
   color: var(--text-2); transition: all 0.15s;
 }
-.hbtn:hover { border-color: var(--brand, #E85D75); color: var(--brand, #E85D75); }
-.hbtn.toggle.off { color: var(--danger, #E84C6F); }
-.hbtn.del:hover { color: var(--danger, #E84C6F); border-color: var(--danger, #E84C6F); }
+.hbtn:hover { border-color: var(--brand); color: var(--brand); }
+.hbtn.toggle.off { color: var(--danger); }
+.hbtn.del:hover { color: var(--danger); border-color: var(--danger); }
 </style>

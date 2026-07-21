@@ -1,6 +1,6 @@
-# jnx 开发指南
+# JNX 开发指南
 
-jnx 是一个基于 Tauri v2 + Vue 3 + TypeScript 的桌面开发者工具箱，提供 JSON 工具、HTTP 请求、剪贴板历史等功能。仓库根在 `jnx/` 的上层目录（即 Git 仓库根），实际应用源码在 `jnx/` 子目录内。
+JNX 是一个基于 Tauri v2 + Vue 3 + TypeScript 的桌面开发者工具箱，提供 JSON 工具、HTTP 请求、剪贴板历史等功能。仓库根在 `jnx/` 的上层目录（即 Git 仓库根），实际应用源码在 `jnx/` 子目录内。
 
 仓库地址：<https://github.com/JNNarrator/jnx>
 

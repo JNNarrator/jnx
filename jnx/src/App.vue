@@ -45,7 +45,9 @@ watchEffect(() => {
   const t = settings.values.theme
 
   let bg='', surface='', sidebar='', topbar='', text1='', text2='', text3=''
+  let synConstant='', synKeyword='', synDecorator='', synType='', synAttr='', synTag='', synPunct=''
   let accent='', accentLight='', accentGlow='', border='', shadow='', cardHover='', grid='', inputBg=''
+  let surface2=''
   let elevBg=''
 
   if (t === 'dark') {
@@ -56,6 +58,9 @@ watchEffect(() => {
     border = 'rgba(255,255,255,0.08)'; shadow = 'rgba(0,0,0,0.2)'
     cardHover = 'rgba(255,255,255,0.04)'; grid = 'rgba(255,255,255,0.02)'; inputBg = 'rgba(255,255,255,0.04)'
     elevBg = '#3D3D3D'
+    surface2 = '#252528'
+    synConstant = '#7EC9A5'; synKeyword = '#6A9FCF'; synDecorator = '#C9A5D4'
+    synType = '#E5B97E'; synAttr = '#8FCAE5'; synTag = '#6A9FCF'; synPunct = '#8E8E96'
   } else if (t === 'light') {
     bg = '#FFF5F7'; surface = '#FFFFFF'; sidebar = '#FFFFFF'; topbar = 'rgba(255,245,247,0.85)'
     text1 = '#2D2528'; text2 = '#555555'; text3 = '#777777'
@@ -63,6 +68,9 @@ watchEffect(() => {
     border = 'rgba(232,93,117,0.1)'; shadow = 'rgba(232,93,117,0.06)'
     cardHover = 'rgba(232,93,117,0.03)'; grid = 'rgba(232,93,117,0.03)'; inputBg = 'rgba(0,0,0,0.02)'
     elevBg = '#FFF7F8'
+    surface2 = '#F8F0F2'
+    synConstant = '#2EAB67'; synKeyword = '#3B82F6'; synDecorator = '#8B5CF6'
+    synType = '#D97706'; synAttr = '#E85D75'; synTag = '#3B82F6'; synPunct = '#8E8E96'
   }
 
   const r = document.documentElement
@@ -93,6 +101,14 @@ watchEffect(() => {
   r.style.setProperty('--info', '#3B82F6')
   r.style.setProperty('--border-strong', 'rgba(255,140,158,0.3)')
   r.style.setProperty('--bg-elev', elevBg)
+  r.style.setProperty('--color-surface-2', surface2)
+  r.style.setProperty('--color-syn-constant', synConstant)
+  r.style.setProperty('--color-syn-keyword', synKeyword)
+  r.style.setProperty('--color-syn-decorator', synDecorator)
+  r.style.setProperty('--color-syn-type', synType)
+  r.style.setProperty('--color-syn-attr', synAttr)
+  r.style.setProperty('--color-syn-tag', synTag)
+  r.style.setProperty('--color-syn-punct', synPunct)
   r.setAttribute('data-theme', t)
 })
 
@@ -165,6 +181,14 @@ const componentMap: Record<string, any> = {
   --brand: #E85D75;
   --border: rgba(255,140,158,0.12);
   --border-strong: rgba(255,140,158,0.25);
+  --color-surface-2: #F8F0F2;
+  --color-syn-constant: #2EAB67;
+  --color-syn-keyword: #3B82F6;
+  --color-syn-decorator: #8B5CF6;
+  --color-syn-type: #D97706;
+  --color-syn-attr: #E85D75;
+  --color-syn-tag: #3B82F6;
+  --color-syn-punct: #8E8E96;
   --success: #2EAB67;
   --warning: #E8A817;
   --danger: #E84C6F;

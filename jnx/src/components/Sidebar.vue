@@ -1,21 +1,54 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { useToolsStore } from '../stores/tools'
+import { ALL_TOOLS } from '../types'
 import { ICONS } from '../theme/icons'
 
 const tools = useToolsStore()
 
 const sidebarCollapsed = ref(false)
 
-const navItems = [
-  { id: 'home', label: '首页', iconKey: 'home' },
-  { id: 'json', label: 'JSON 工具', iconKey: 'brackets' },
-  { id: 'converter', label: '格式互转', iconKey: 'convert' },
-  { id: 'curl', label: 'HTTP 请求', iconKey: 'terminal' },
-  { id: 'clipboard', label: '剪贴板', iconKey: 'clipboard' },
-  { id: 'settings', label: '设置', iconKey: 'settings' },
-  { id: 'shortcuts', label: '快捷键', iconKey: 'command' },
-]
+// 系统项 ID（设置/快捷键等路由页，不进入工具派生循环）
+const SYSTEM_IDS = ['settings', 'shortcuts'] as const
+
+interface SidebarItem {
+  type: 'home' | 'tool' | 'system' | 'separator'
+  id?: string
+  label?: string
+  icon?: string
+}
+
+// ─── 单一派生函数：从 ALL_TOOLS 全量派生 sidebar 条目 ───
+// 首页固定置顶，工具项 = ALL_TOOLS 中非系统项全量，系统项单独追加在末尾
+const sidebarItems = computed<SidebarItem[]>(() => {
+  const items: SidebarItem[] = [
+    { type: 'home', id: 'home', label: '首页', icon: 'home' },
+    ...ALL_TOOLS
+      .filter(t => !(SYSTEM_IDS as readonly string[]).includes(t.id))
+      .map(t => ({ type: 'tool' as const, id: t.id, label: t.label, icon: t.icon })),
+  ]
+
+  // 系统项追加在工具项之后，通过 separator 视觉分隔
+  const sysItems = ALL_TOOLS.filter(t => (SYSTEM_IDS as readonly string[]).includes(t.id))
+  if (sysItems.length > 0) {
+    items.push({ type: 'separator' })
+    items.push(...sysItems.map(t => ({ type: 'system' as const, id: t.id, label: t.label, icon: t.icon })))
+  }
+
+  // 开发期完整性断言：ALL_TOOLS 每增/删工具，sidebar 自动同步（否则报警）
+  if (import.meta.env.DEV) {
+    const toolCount = items.filter(i => i.type === 'tool').length
+    const expected = ALL_TOOLS.filter(t => !(SYSTEM_IDS as readonly string[]).includes(t.id)).length
+    if (toolCount !== expected) {
+      console.warn(
+        `[Sidebar] 工具项数不一致：sidebar 渲染 ${toolCount} 项，` +
+        `ALL_TOOLS 有 ${expected} 项。新增/删除了工具但 Sidebar 派生未同步。`
+      )
+    }
+  }
+
+  return items
+})
 
 function navigate(id: string) {
   tools.setActiveTab(id)
@@ -24,22 +57,26 @@ function navigate(id: string) {
 
 <template>
   <aside class="sidebar" :class="{ collapsed: sidebarCollapsed }">
-    <!-- Navigation items -->
     <nav class="nav-list">
-      <button
-        v-for="item in navItems"
-        :key="item.id"
-        class="nav-item"
-        :class="{ active: tools.activeTabId === item.id }"
-        @click="navigate(item.id)"
-        :title="sidebarCollapsed ? item.label : ''"
-      >
-        <span class="nav-icon" v-html="ICONS[item.iconKey]"></span>
-        <span class="nav-label" v-show="!sidebarCollapsed">{{ item.label }}</span>
-      </button>
+      <template v-for="item in sidebarItems" :key="item.type === 'separator' ? `sep` : item.id">
+        <!-- 分隔线 -->
+        <div v-if="item.type === 'separator'" class="nav-separator"></div>
+
+        <!-- 首页 / 工具项 / 系统项 -->
+        <button
+          v-else
+          class="nav-item"
+          :class="{ active: tools.activeTabId === item.id }"
+          @click="navigate(item.id!)"
+          :title="sidebarCollapsed ? item.label : ''"
+        >
+          <span class="nav-icon" v-html="ICONS[item.icon!]"></span>
+          <span class="nav-label" v-show="!sidebarCollapsed">{{ item.label }}</span>
+        </button>
+      </template>
     </nav>
 
-    <!-- Collapse toggle at bottom -->
+    <!-- 折叠/展开按钮 -->
     <button class="collapse-btn" @click="sidebarCollapsed = !sidebarCollapsed" :title="sidebarCollapsed ? '展开' : '折叠'">
       <span class="collapse-icon" v-html="ICONS[sidebarCollapsed ? 'collapseRight' : 'collapseLeft']"></span>
     </button>
@@ -72,6 +109,13 @@ function navigate(id: string) {
   overflow-y: auto;
 }
 
+.nav-separator {
+  height: 1px;
+  margin: 6px 12px;
+  background: var(--color-border, rgba(232,93,117,0.1));
+  flex-shrink: 0;
+}
+
 .nav-item {
   display: flex;
   align-items: center;
@@ -87,6 +131,7 @@ function navigate(id: string) {
   transition: all 0.15s ease;
   text-align: left;
   white-space: nowrap;
+  min-width: 0;
   position: relative;
 }
 

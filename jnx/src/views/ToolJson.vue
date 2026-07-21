@@ -2,7 +2,7 @@
 import { ref, watch } from 'vue'
 import { useMessage } from 'naive-ui'
 import { useKeyboardShortcut } from '../composables/useKeyboardShortcut'
-import JsonEditor from '../components/JsonEditor.vue'
+import CodeEditor from '../components/CodeEditor.vue'
 import JsonTree from '../components/JsonTree.vue'
 import DraggableSplitter from '../components/DraggableSplitter.vue'
 import type { FlatJsonNode } from '../types'
@@ -167,7 +167,7 @@ watch(searchQuery, (val) => {
     <!-- ─── Panels ─── -->
     <div class="panels">
       <div class="panel-left" :style="{ width: (splitRatio * 100) + '%' }">
-        <JsonEditor v-model="input" :error-line="errorLineRef" />
+        <CodeEditor v-model="input" language="json" :error-line="errorLineRef" />
       </div>
       <DraggableSplitter @update:ratio="splitRatio = $event" />
       <div class="panel-right">
