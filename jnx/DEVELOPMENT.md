@@ -19,6 +19,7 @@ jnx 是一个基于 Tauri v2 + Vue 3 + TypeScript 的桌面开发者工具箱，
 | CSS 变量 | 自定义主题系统 | **light / dark 两套**（已移除 pink / system） |
 | 持久化 | SQLite (`tauri-plugin-sql`) | `settings` 表（KV）+ `clipboard_history` 表 |
 | 包管理 | npm | node >=18 |
+| 语法高亮 | 自研纯函数 tokenizer（8 种语言） | 字符串优先匹配，完整闭合 span，无正则回溯 DoS |
 | Rust 依赖 | reqwest 0.12, serde, tauri-plugin-* | HTTP 请求、快捷键、系统信息等 |
 | 快捷键 | 自研 `useKeyboardShortcut` 系统 | 平台感知（mod = ⌘/Ctrl）、可自定义覆盖、冲突检测 |
 | 字体 | **JetBrains Mono**（本地 woff2 自托管） | `@font-face` 在 `assets/styles/fonts.css` 声明，`main.ts` 引入；Naive UI themeOverrides 同步注入 |
@@ -48,9 +49,9 @@ jnx/
 │   ├── App.vue                 # 根组件：布局 + 主题 + 字体 + 快捷键注册
 │   ├── components/             # 可复用 UI 组件
 │   │   ├── TopBar.vue          # 顶栏（搜索框接 openPalette、主题切换、版本号）
-│   │   ├── Sidebar.vue         # 侧边栏导航（可折叠）
+│   │   ├── Sidebar.vue         # 侧边栏导航（可折叠/拖拽调宽/CSS 变量 --sidebar-w）
 │   │   ├── CommandPalette.vue  # 命令面板（Teleport 到 body，Esc/遮罩关闭，键盘可导航）
-│   │   ├── JsonEditor.vue      # JSON 代码编辑器
+│   │   ├── CodeEditor.vue      # 通用代码编辑器（8 种语言语法高亮 + 行号 + Tab/Enter 自动缩进）
 │   │   ├── JsonTree.vue        # JSON 树形浏览器 + 搜索
 │   │   ├── HeaderEditor.vue    # HTTP 请求头编辑器
 │   │   ├── DraggableSplitter.vue # 可拖拽分隔条
@@ -60,10 +61,11 @@ jnx/
 │   │   ├── ToolJson.vue        # JSON 工具
 │   │   ├── ToolCurl.vue        # HTTP 请求工具
 │   │   ├── ToolClipboard.vue   # 剪贴板历史
-│   │   ├── ToolConverter.vue   # 格式互转（JSON/YAML/TOML/XML/CSV）
+│   │   ├── ToolConverter.vue   # 格式互转（JSON/YAML/TOML/XML/CSV/Properties）
 │   │   ├── ToolCron.vue        # Cron 表达式可视化
 │   │   ├── ToolSettings.vue    # 设置页（主题/标签栏/剪贴板）
-│   │   └── ToolShortcuts.vue   # 快捷键自定义页（录制/冲突检测/恢复默认）
+│   │   ├── ToolShortcuts.vue   # 快捷键自定义页（录制/冲突检测/恢复默认）
+│   │   └── JsonJavabean.vue    # JSON ⇄ JavaBean 互转
 │   ├── stores/                 # Pinia 状态管理
 │   │   ├── tools.ts            # 工具标签管理（打开/关闭/激活）
 │   │   ├── settings.ts         # 应用设置（从 SQLite 读写）
@@ -76,8 +78,8 @@ jnx/
 │   │   ├── useHttpSend.ts      # HTTP 发送（invoke custom_fetch）
 │   │   ├── useKeyboardShortcut.ts # 快捷键引擎（注册中心/分发/更新/调试日志）
 │   │   ├── usePlatform.ts      # 平台检测（mac/win，UA 兜底 + Tauri OS 插件修正）
-│   │   ├── useRecentTools.ts   # 最近使用工具（localStorage 持久化）
-│   │   └── useToolDraft.ts     # 工具草稿自动清理
+│   │   ├── useToolDraft.ts     # 工具草稿自动清理
+│   │   └── useRecentTools.ts   # 最近使用工具（localStorage 持久化）
 │   ├── shortcuts/              # 快捷键定义
 │   │   ├── index.ts            # SHORTCUTS 映射表 + 分组 + HOME_CHEATSHEET
 │   │   └── types.ts            # Chord / PlatformChords / Mod 类型
@@ -85,7 +87,9 @@ jnx/
 │   │   └── index.ts            # ToolTab（含 category/order/keywords/isSystem）, Settings, ClipboardItem, FlatJsonNode, CATEGORY_META
 │   ├── utils/                  # 工具函数
 │   │   ├── db.ts               # SQLite 数据库操作（设置/剪贴板 CRUD）
-│   │   └── parseCurl.ts        # cURL 命令解析器
+│   │   ├── parseCurl.ts        # cURL 命令解析器
+│   │   ├── converter.ts        # 格式互转引擎（JSON/YAML/TOML/XML/CSV/Properties）
+│   │   └── cron.ts             # Cron 表达式解析/构建/描述
 │   ├── assets/                 # 静态资源
 │   │   ├── fonts/              # JetBrains Mono woff2 字体文件（SIL Open Font License 1.1，自托管）
 │   │   └── styles/
@@ -184,6 +188,48 @@ jnx/
 | `json.run` | ⌘↵ | Ctrl+Enter | |
 | `json.format` | ⌘⇧F | Ctrl+Shift+F | |
 | `clipboard.pin` | ⌘⇧C | Ctrl+Shift+C | |
+
+---
+
+## 代码编辑器 CodeEditor
+
+`CodeEditor.vue` 是全局统一的代码输入组件，替换了所有页面的原生 textarea / NInput / JsonEditor。
+
+### 支持的语言
+
+| 语言 | tokenizer | 高亮色 |
+|------|-----------|--------|
+| JSON | `highlightJson` | 字符串（accent）、数字（success）、关键字（info）、注释（tertiary italic） |
+| Java | `highlightJava` | 同上 + 注解（syn-annotation）、类型（syn-type） |
+| YAML | `highlightYaml` | 字符串、注释、`key:` 冒号前（attr） |
+| TOML | `highlightToml` | 字符串、数字、`[section]`（type）、`key=` 前（attr）、注释 |
+| XML | `highlightXml` | 标签名（keyword）、属性名（attr）、`< > </` 定界符（punct）、字符串值 |
+| CSV | `highlightCsv` | 首行表头（keyword） |
+| Properties | `highlightProperties` | `key=` 前（attr）、注释、行内值（string） |
+| Plaintext | `highlightPlaintext` | 无高亮（纯文本） |
+
+### 铁律（所有 tokenizer 遵守）
+
+1. 字符串先于关键词匹配，避免 HTML 标签属性等被误认
+2. 前缀+后缀完整闭合：`属性 ` 整体输出，不拆成 `属性 + 值`
+3. 非字符串区段用 `escapeHtml` 转义，不输出裸 `< > &`
+4. 每行独立处理，不跨行状态（避免长文本 DoS，简化调试）
+5. 纯函数，无副作用，输入 → 输出 HTML
+
+### 交互行为
+
+- `Tab` → 插入 2 空格（无选区）/ 块缩进（有选区）/ `Shift+Tab` 块取消缩进
+- `Enter` → 自动缩进：继承上一行缩进，YAML 行末冒号自动加 2 空格，`- ` 列表项自动缩进
+- 行号显示，当前行高亮
+- 错误行标记（`:error-line` prop）
+
+### 替换注意事项
+
+- **ToolConverter**：原 NInput 的 `onEditorKeydown` 自动缩进逻辑已删除，全部由 CodeEditor 接管
+- **ToolCurl**：body textarea 和 modal textarea 均已替换；modal 内使用 `height:180px` 固定高度容器
+- **ToolJson**：原 JsonEditor 路径已废弃，全部使用 `CodeEditor(language="json")`
+
+---
 
 ### 添加新快捷键
 
@@ -329,3 +375,25 @@ CREATE TABLE clipboard_history (
 - HTTP 请求用 `useHttpSend` composable，不直接前端 `fetch`
 - 命名规范：PascalCase 组件/类型，camelCase 变量/函数，kebab-case CSS class
 - 主题值只能是 `'light' | 'dark'`，新增主题需同步改 `Settings` 类型、`App.vue` 主题分支与 `ToolSettings` 选项，并删除对旧值的引用（避免 `cycleTheme`/命令面板写入失效值）
+
+---
+
+## 按钮统一
+
+Naive UI primary 颜色通过 `App.vue` 的 `themeOverrides.common.primaryColor` 统一覆盖为 `#E85D75`（品牌色），无需在各页加自定义 CSS。
+
+已清理的自定义覆盖：
+- `JsonJavabean.vue`：删除 `.btn-accent` 类，改用 `type="primary"`
+- `ToolCron.vue`：删除 `.generate-btn:deep(.n-button)` 颜色强制覆盖
+
+---
+
+## 侧栏拖拽调宽
+
+`Sidebar.vue` 内置完整的拖拽调宽系统：
+- `resize-handle` 绝对定位在侧栏右侧边缘（需 `.sidebar` 有 `position: relative`）
+- Pointer events 拖拽，requestAnimationFrame 节流
+- 键盘 `←`/`→`/`Home`/`End` 调宽
+- 宽度通过 CSS 变量 `--sidebar-w` 同步，设置持久化到 SQLite
+- 拖拽到 `SNAP_THRESHOLD（140px）` 以下松手自动折叠
+- 最小值 `MIN_WIDTH = 180`，最大值 `MIN(MAX_WIDTH = 480, 40vw)`
