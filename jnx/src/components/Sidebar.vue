@@ -247,6 +247,8 @@ onBeforeUnmount(() => {
   --sidebar-min: 180px;
   --sidebar-max: 480px;
 
+  position: relative;
+  min-width: 60px;
   width: min(var(--sidebar-w, 220px), 40vw, var(--sidebar-max));
   flex-shrink: 0;
   display: flex;
