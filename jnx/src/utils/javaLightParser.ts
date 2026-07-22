@@ -108,30 +108,38 @@ function findBlock(text: string, openBrace: number): Block | null {
 function extractAnnotations(text: string): { annotations: string[]; rest: string } {
   const annotations: string[] = []
   let rest = text.trim()
-  while (rest.startsWith('@')) {
-    let i = 0
-    // Match annotation name
+  let maxIter = 100
+  while (rest.startsWith('@') && maxIter-- > 0) {
+    const prevLen = rest.length
+    let i = 1  // skip '@'
     while (i < rest.length && /[a-zA-Z0-9_.]/.test(rest[i])) i++
-    // Handle @XXX(...)
-    let j = i
-    while (j < rest.length && rest[j] === ' ') j++
-    if (rest[j] === '(') {
-      let depth = 0
-      let k = j
-      while (k < rest.length) {
-        if (rest[k] === '(') depth++
-        else if (rest[k] === ')') {
-          depth--
-          if (depth === 0) { k++; break }
+    if (i > 1) {
+      // Has identifier after @
+      let j = i
+      while (j < rest.length && rest[j] === ' ') j++
+      if (rest[j] === '(') {
+        let depth = 0
+        let k = j
+        while (k < rest.length) {
+          if (rest[k] === '(') depth++
+          else if (rest[k] === ')') {
+            depth--
+            if (depth === 0) { k++; break }
+          }
+          k++
         }
-        k++
+        annotations.push(rest.slice(0, k).trim())
+        rest = rest.slice(k).trim()
+      } else {
+        annotations.push(rest.slice(0, i).trim())
+        rest = rest.slice(i).trim()
       }
-      annotations.push(rest.slice(0, k).trim())
-      rest = rest.slice(k).trim()
     } else {
-      annotations.push(rest.slice(0, i).trim())
-      rest = rest.slice(i).trim()
+      // Bare @ or @ followed by non-identifier — skip one char to avoid infinite loop
+      rest = rest.slice(1).trim()
     }
+    // Hard safety: if length didn't change, break
+    if (rest.length === prevLen) break
   }
   return { annotations, rest }
 }

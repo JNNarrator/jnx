@@ -1,13 +1,19 @@
 <script setup lang="ts">
 import { useSettingsStore } from '../stores/settings'
-import { NSelect, NInputNumber, NDivider, useMessage } from 'naive-ui'
+import { NSelect, NInputNumber, NDivider, NSwitch, NButton, useMessage } from 'naive-ui'
+import { clearAllToolStates } from '../utils/db'
 
 const settings = useSettingsStore()
 const msg = useMessage()
 
 function save(key: string, value: string | number) {
-  settings.update(key, value)
+  settings.update(key, value as string | number | boolean)
   msg.success('已保存')
+}
+
+async function clearAllMemory() {
+  await clearAllToolStates()
+  msg.success('已清除所有工具记忆')
 }
 </script>
 
@@ -79,6 +85,24 @@ function save(key: string, value: string | number) {
         />
       </div>
       <p class="setting-hint">间隔越小响应越快，但 CPU 占用稍高。</p>
+    </div>
+
+    <NDivider :style="{ '--n-color': 'var(--color-border)' }" />
+
+    <div class="settings-section">
+      <h3>工具记忆</h3>
+      <div class="setting-row">
+        <label>自动记忆工具状态</label>
+        <NSwitch
+          :value="settings.values.tool_memory_enabled"
+          @update:value="(val: boolean) => save('tool_memory_enabled', val ? 'true' : 'false')"
+          size="small"
+        />
+      </div>
+      <div class="setting-row" style="flex-direction: column; align-items: flex-start; gap: 8px;">
+        <p class="setting-hint">启用后会自动记住各工具的最后状态（输入内容、选项位置等），重启后恢复。</p>
+        <NButton size="small" tertiary @click="clearAllMemory">清除所有已记忆的状态</NButton>
+      </div>
     </div>
   </div>
 </template>

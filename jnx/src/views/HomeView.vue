@@ -1,84 +1,243 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { ref, computed } from 'vue'
 import { useToolsStore } from '../stores/tools'
-import { ALL_TOOLS } from '../types'
+import { useRecentTools } from '../composables/useRecentTools'
+import { ALL_TOOLS, CATEGORY_META, type CategoryId } from '../types'
+import type { ToolTab } from '../types'
 import { ICONS } from '../theme/icons'
 import { HOME_CHEATSHEET } from '../shortcuts'
 import Kbd from '../components/Kbd.vue'
 
 const tools = useToolsStore()
+const { recentTools, clearRecent } = useRecentTools()
 
-// 系统项 ID（不混入工具分区）
-const SYSTEM_IDS = ['settings', 'shortcuts']
+/* ─── Search ─── */
+const searchQuery = ref('')
+const searchInput = ref<HTMLInputElement | null>(null)
 
-// ─── 从 ALL_TOOLS 全量派生首页卡片分组，禁止手写工具条目 ───
-// 工具分区：ALL_TOOLS 中非系统项全量，保留原始顺序
-const toolCards = computed(() =>
-  ALL_TOOLS
-    .filter(t => !SYSTEM_IDS.includes(t.id))
-    .map(t => ({ id: t.id, label: t.label, icon: t.icon, desc: t.desc || '' }))
-)
+/* ─── Category collapse state (localStorage) ─── */
+const COLLAPSE_KEY = 'jnx:home-collapsed'
+function readCollapsed(): Record<string, boolean> {
+  try { const raw = localStorage.getItem(COLLAPSE_KEY); return raw ? JSON.parse(raw) : {} }
+  catch { return {} }
+}
+function writeCollapsed(val: Record<string, boolean>) {
+  try { localStorage.setItem(COLLAPSE_KEY, JSON.stringify(val)) } catch {}
+}
+const collapsed = ref<Record<string, boolean>>(readCollapsed())
 
-// 系统分区：设置/快捷键等路由页，单独成组
-const systemCards = computed(() =>
-  ALL_TOOLS
-    .filter(t => SYSTEM_IDS.includes(t.id))
-    .map(t => ({ id: t.id, label: t.label, icon: t.icon, desc: t.desc || '' }))
-)
+function toggleCategory(id: string) {
+  collapsed.value[id] = !collapsed.value[id]
+  writeCollapsed({ ...collapsed.value })
+}
 
+/* ─── Tool categorization ─── */
+const toolCategories = computed(() => {
+  const map: Record<string, ToolTab[]> = {}
+  for (const t of ALL_TOOLS.filter(t => !t.isSystem)) {
+    const catId = t.category || 'other'
+    if (!map[catId]) map[catId] = []
+    map[catId].push(t)
+  }
+  const cats: CategoryId[] = ['format', 'network', 'efficiency']
+  return cats
+    .filter(c => map[c]?.length)
+    .map(c => ({ id: c, tools: (map[c] || []).sort((a, b) => (a.order ?? 99) - (b.order ?? 99)) }))
+})
+
+const systemTools = computed(() => ALL_TOOLS.filter(t => t.isSystem))
+
+/* ─── Live data ─── */
+const liveData = computed(() => {
+  const toolCount = ALL_TOOLS.filter(t => !t.isSystem).length
+  const catCount = toolCategories.value.length
+  const recentCount = recentTools.value.length
+  return { toolCount, catCount, recentCount }
+})
+
+/* ─── Search filtering ─── */
+const hasActiveFilter = computed(() => searchQuery.value.trim().length > 0)
+
+const filteredTools = computed(() => {
+  const q = searchQuery.value.trim().toLowerCase()
+  if (!q) return null
+  return ALL_TOOLS.filter(t => {
+    const fields = [t.label, t.desc, ...(t.keywords || []), CATEGORY_META[t.category || 'other']?.label]
+    return fields.some(f => f?.toLowerCase().includes(q))
+  })
+})
+
+/* ─── Icon fallback ─── */
+function resolveIcon(name: string): string {
+  return ICONS[name] || ICONS['command'] // command as generic fallback
+}
+
+/* ─── Actions ─── */
 function openTool(id: string) { tools.setActiveTab(id) }
+function onSearchInput() { /* reactive enough */ }
+
+/* ─── Relative time for recent tools ─── */
+function relativeTime(ts: number): string {
+  const diff = Date.now() - ts
+  if (diff < 60000) return '刚刚'
+  if (diff < 3600000) return `${Math.floor(diff / 60000)} 分钟前`
+  if (diff < 86400000) return `${Math.floor(diff / 3600000)} 小时前`
+  if (diff < 604800000) return `${Math.floor(diff / 86400000)} 天前`
+  return `${Math.floor(diff / 604800000)} 周前`
+}
+
+/* onUnmounted: no timers to clean */
+
+/* ─── Stagger animation helpers ─── */
+function cardDelay(index: number): string {
+  return `${Math.min(index * 30, 200)}ms`
+}
 </script>
 
 <template>
   <div class="home-view">
-    <!-- 装饰层：全视口背景网格 + 辉光 -->
+    <!-- Ambient background -->
     <div class="bg-grid"></div>
     <div class="bg-glow"></div>
 
-    <!-- 统一内容容器：slogan → 分区网格 → 速查，共用同一 max-width + margin auto -->
-    <div class="home-inner">
-      <!-- slogan：流式标题，与网格同宽同左边界，禁止独立定位 -->
-      <div class="brand-area">
-        <h1 class="brand-logo">✦ JNX</h1>
-        <p class="brand-subtitle">JNX · 开发者的随身工具箱</p>
+    <div class="home-content">
+      <!-- ─── Hero: left-aligned + live data + search integrated ─── -->
+      <div class="hero-area">
+        <div class="hero-top">
+          <h1 class="hero-title">
+            <span class="hero-logo">✦</span>
+            <span>jnx</span>
+          </h1>
+          <p class="hero-subtitle">开发者的随身工具箱</p>
+          <p class="hero-data">
+            <span class="data-count">{{ liveData.toolCount }}</span> 个工具 ·
+            <span class="data-count">{{ liveData.catCount }}</span> 个分类 ·
+            <span v-if="liveData.recentCount > 0" class="data-count">{{ liveData.recentCount }}</span>
+            <span v-else>0</span> 最近使用
+          </p>
+        </div>
+
+        <!-- Search bar (integrated into hero block, same width as grid) -->
+        <div class="search-bar" @click="searchInput?.focus()">
+          <span class="search-icon" v-html="ICONS.search"></span>
+          <input
+            ref="searchInput"
+            v-model="searchQuery"
+            class="search-input"
+            placeholder="搜索工具…"
+            @input="onSearchInput"
+          />
+          <kbd v-if="!searchQuery" class="search-hint">⌘K</kbd>
+          <button v-else class="search-clear" @click.stop="searchQuery = ''">✕</button>
+        </div>
       </div>
 
-      <!-- 工具分区 -->
-      <section v-if="toolCards.length > 0" class="section">
-        <h2 class="section-title">工具</h2>
-        <div class="card-grid">
-          <div v-for="card in toolCards" :key="card.id" class="tool-card" @click="openTool(card.id)">
-            <div class="card-icon-wrap">
-              <span class="card-icon" v-html="ICONS[card.icon]"></span>
-            </div>
-            <div class="card-body">
-              <div class="card-title">{{ card.label }}</div>
-              <div class="card-desc">{{ card.desc }}</div>
-            </div>
-            <span class="card-chevron" v-html="ICONS.chevronRight"></span>
+      <!-- ─── Search results ─── -->
+      <div v-if="hasActiveFilter && filteredTools" class="search-results">
+        <div
+          v-for="t in filteredTools"
+          :key="t.id"
+          class="search-result-item"
+          @click="openTool(t.id)"
+        >
+          <span class="sr-icon" v-html="resolveIcon(t.icon)"></span>
+          <span class="sr-label">{{ t.label }}</span>
+          <span class="sr-desc">{{ t.desc }}</span>
+        </div>
+        <div v-if="filteredTools.length === 0" class="search-empty">无匹配结果</div>
+      </div>
+
+      <!-- ─── Recent tools (搜索时隐藏) ─── -->
+      <div v-if="!hasActiveFilter" class="section recent-section">
+        <div v-if="recentTools.length > 0">
+          <div class="section-header">
+            <span class="section-icon" v-html="ICONS.clock"></span>
+            <span class="section-title">继续上次</span>
+            <button class="section-action" @click="clearRecent">清除记录</button>
+          </div>
+          <div class="recent-row">
+            <button
+              v-for="rt in recentTools.slice(0, 6)"
+              :key="rt.toolId"
+              class="recent-chip"
+              @click="openTool(rt.toolId)"
+            >
+              <span class="recent-chip-icon" v-html="resolveIcon(rt.tool?.icon || 'home')"></span>
+              <span class="recent-chip-label">{{ rt.tool?.label || rt.toolId }}</span>
+              <span class="recent-chip-time">{{ relativeTime(rt.lastUsedAt) }}</span>
+            </button>
           </div>
         </div>
-      </section>
+        <!-- 空态占位：不要整段隐藏留空白 -->
+        <div v-else class="recent-empty">
+          <span class="section-icon" v-html="ICONS.clock"></span>
+          <span class="recent-empty-text">还没有最近使用 · 打开任意工具即记录于此</span>
+        </div>
+      </div>
 
-      <!-- 系统分区 -->
-      <section v-if="systemCards.length > 0" class="section">
-        <h2 class="section-title">系统</h2>
-        <div class="card-grid">
-          <div v-for="card in systemCards" :key="card.id" class="tool-card" @click="openTool(card.id)">
-            <div class="card-icon-wrap">
-              <span class="card-icon" v-html="ICONS[card.icon]"></span>
+      <!-- ─── 分类工具网格 ─── -->
+      <div v-if="!hasActiveFilter" class="categories-area">
+        <div
+          v-for="cat in toolCategories"
+          :key="cat.id"
+          class="category-section"
+        >
+          <div class="section-header collapsible" @click="toggleCategory(cat.id)">
+            <span
+              class="section-icon"
+              :style="{ color: CATEGORY_META[cat.id].color }"
+              v-html="ICONS[CATEGORY_META[cat.id].icon]"
+            ></span>
+            <span class="section-title">{{ CATEGORY_META[cat.id].label }}</span>
+            <span class="section-count">{{ cat.tools.length }}</span>
+            <span class="collapse-arrow" :class="{ open: !collapsed[cat.id] }">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M9 18l6-6-6-6"/></svg>
+            </span>
+          </div>
+          <div v-if="!collapsed[cat.id]" class="category-grid">
+            <div
+              v-for="(t, idx) in cat.tools"
+              :key="t.id"
+              class="tool-card"
+              :class="{ hero: t.pinned }"
+              @click="openTool(t.id)"
+              :style="{ '--card-delay': cardDelay(idx) }"
+            >
+              <div class="card-icon-wrap" :style="{ background: CATEGORY_META[cat.id].color }">
+                <span class="card-icon" v-html="resolveIcon(t.icon)"></span>
+              </div>
+              <div class="card-body">
+                <div class="card-title">{{ t.label }}</div>
+                <div class="card-desc">{{ t.desc }}</div>
+              </div>
+              <!-- chevron on right, slides right on hover -->
+              <span class="card-chevron" v-html="ICONS.chevronRight"></span>
             </div>
-            <div class="card-body">
-              <div class="card-title">{{ card.label }}</div>
-              <div class="card-desc">{{ card.desc }}</div>
-            </div>
-            <span class="card-chevron" v-html="ICONS.chevronRight"></span>
           </div>
         </div>
-      </section>
+      </div>
 
-      <!-- 快捷键速查 -->
-      <div class="shortcuts-section">
+      <!-- ─── 系统工具 ─── -->
+      <div v-if="!hasActiveFilter" class="section system-section">
+        <div class="section-header">
+          <span class="section-icon" v-html="ICONS.settings"></span>
+          <span class="section-title">系统工具</span>
+        </div>
+        <div class="system-row">
+          <button
+            v-for="t in systemTools"
+            :key="t.id"
+            class="system-chip"
+            @click="openTool(t.id)"
+          >
+            <span class="system-chip-icon" v-html="resolveIcon(t.icon)"></span>
+            <span class="system-chip-label">{{ t.label }}</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- ─── 快捷键速查 ─── -->
+      <div v-if="!hasActiveFilter" class="section shortcuts-section">
         <div class="section-header">
           <span class="section-icon" v-html="ICONS.keyboard"></span>
           <span class="section-title">快捷键速查</span>
@@ -95,244 +254,309 @@ function openTool(id: string) { tools.setActiveTab(id) }
 </template>
 
 <style scoped>
-/* ─── 外层容器：唯一滚动容器，flex 撑满父级给定高度 ─── */
+/* ═══ Home view root ═══ */
 .home-view {
   height: 100%;
-  overflow-y: auto;
-  position: relative;
-}
-
-/* ─── 装饰层（全视口，不干扰内容流） ─── */
-.bg-grid {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background-image:
-    repeating-linear-gradient(0deg, transparent, transparent 39px, var(--color-grid, rgba(232,93,117,0.03)) 40px),
-    repeating-linear-gradient(90deg, transparent, transparent 39px, var(--color-grid, rgba(232,93,117,0.03)) 40px);
-}
-
-.bg-glow {
-  position: absolute;
-  top: 0;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 600px;
-  height: 400px;
-  pointer-events: none;
-  background: radial-gradient(circle at center, var(--color-accent-glow, rgba(232,93,117,0.08)) 0%, transparent 60%);
-}
-
-/* ─── 统一内容容器 ───
-  * 所有内容块共用该容器：slogan 入流不再独立定位，
-  * 网格与标题同宽同边界，禁止 slogan 与网格不同 max-width。
-  * 超宽由 max-width 封顶不再加列，窄屏由 padding-inline 收敛。
-  * ─── */
-.home-inner {
-  width: 100%;
-  max-width: 1200px;
-  margin-inline: auto;
-  padding: 40px 24px 56px;
-  position: relative;
-  z-index: 1;
   display: flex;
-  flex-direction: column;
-  gap: 28px;
-}
-
-/* ─── slogan：流式标题，与网格同容器，禁止脱离文档流 ─── */
-.brand-area {
-  text-align: center;
-}
-
-.brand-logo {
-  font-size: 32px;
-  font-weight: 800;
-  letter-spacing: 0.5px;
-  margin: 0 0 6px;
-  line-height: 1.2;
-  background: linear-gradient(135deg, var(--color-accent, #E85D75), var(--color-accent-light, #FFB6C1));
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-}
-
-.brand-subtitle {
-  font-size: 14px;
-  color: var(--color-text-secondary, #6A5A60);
-  font-weight: 400;
-  margin: 0;
-}
-
-/* ─── 分区 ─── */
-.section {
-  display: flex;
-  flex-direction: column;
-}
-
-.section-title {
-  font-size: 13px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  color: var(--color-text-secondary);
-  margin: 0 0 12px;
-}
-
-/* ─── 卡片网格 ───
-  * auto-fit + minmax 自收敛列数，窄屏单列 / 宽屏多列 / 超宽由 max-width 封顶。
-  * 禁止写死 repeat(2)/1fr 1fr。
-  * ─── */
-.card-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: 16px;
-}
-
-/* ─── 工具卡片 ───
-  * min-width:0 防溢出铁律；
-  * 等高由 grid row stretch 保证；
-  * ─── */
-.tool-card {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  padding: 18px 20px;
-  background: var(--color-surface, #FFF);
-  border: 1px solid var(--color-border, rgba(232,93,117,0.12));
-  border-radius: 14px;
-  cursor: pointer;
-  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 0 1px 3px var(--color-shadow, rgba(232,93,117,0.06));
-  min-width: 0;
-}
-
-.tool-card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 8px 25px var(--color-shadow, rgba(232,93,117,0.15));
-  border-color: var(--color-accent-light, #FFB6C1);
-}
-
-.tool-card:hover .card-icon-wrap {
-  transform: translateY(-2px) scale(1.05);
-}
-
-.card-icon-wrap {
-  width: 44px;
-  height: 44px;
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
+  position: relative;
+  overflow-y: auto;
+  padding: 28px 24px 40px;
+}
+
+/* ─── Ambient background ─── */
+.bg-grid {
+  position: fixed; inset: 0; pointer-events: none;
+  background-image:
+    repeating-linear-gradient(0deg, transparent, transparent 39px, var(--color-grid) 40px),
+    repeating-linear-gradient(90deg, transparent, transparent 39px, var(--color-grid) 40px);
+}
+.bg-glow {
+  position: fixed; top: 0; left: 20%; /* shifted left to follow the left-aligned hero */
+  width: 600px; height: 450px; pointer-events: none;
+  background: radial-gradient(ellipse at center, var(--color-accent-glow) 0%, transparent 60%);
+}
+
+/* ─── Content container (unified max-width, left-aligned) ─── */
+.home-content {
+  position: relative; z-index: 1;
+  display: flex; flex-direction: column;
+  width: 100%; max-width: 700px; /* wider than before for better grid */
+}
+
+/* ═══ Hero area (left-aligned) ═══ */
+.hero-area {
+  display: flex; flex-direction: column;
+  gap: 14px;
+  padding-bottom: 8px;
+}
+.hero-top {
+  display: flex; flex-direction: column;
+  align-items: flex-start; /* left-aligned */
+}
+.hero-title {
+  font-size: 26px; font-weight: 800; line-height: 1.2;
+  display: flex; align-items: center; gap: 6px;
+  color: var(--color-text-primary);
+}
+.hero-logo {
+  background: linear-gradient(135deg, var(--color-accent), var(--color-accent-light));
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+  font-size: 28px;
+}
+.hero-subtitle {
+  font-size: 14px; color: var(--color-text-secondary); font-weight: 400;
+  margin: 2px 0 0 0;
+}
+.hero-data {
+  font-size: 12px; color: var(--color-text-tertiary); margin: 4px 0 0 0;
+  letter-spacing: 0.2px;
+}
+.data-count {
+  font-family: var(--font-mono);
+  font-weight: 600;
+  color: var(--color-accent);
+}
+
+/* ═══ Search bar ═══ */
+.search-bar {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 16px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
   border-radius: 12px;
-  background: linear-gradient(135deg, var(--color-accent, #E85D75), var(--color-accent-light, #FFB6C1));
-  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  cursor: text;
+  transition: border-color 0.2s, box-shadow 0.2s;
 }
+.search-bar:focus-within {
+  border-color: var(--color-accent-light);
+  box-shadow: 0 0 0 3px var(--color-accent-glow);
+}
+.search-icon { width: 18px; height: 18px; flex-shrink: 0; color: var(--color-text-tertiary); display: flex; }
+.search-icon :deep(svg) { width: 100%; height: 100%; }
+.search-input {
+  flex: 1; border: none; outline: none; background: transparent;
+  font-size: 14px; color: var(--color-text-primary); font-family: inherit;
+}
+.search-input::placeholder { color: var(--color-text-tertiary); }
+.search-hint {
+  font-size: 11px; padding: 2px 7px; border-radius: 4px;
+  background: var(--color-border); color: var(--color-text-tertiary); font-family: inherit;
+}
+.search-clear {
+  border: none; background: transparent; color: var(--color-text-tertiary);
+  cursor: pointer; font-size: 14px; padding: 2px 6px; border-radius: 4px;
+}
+.search-clear:hover { background: var(--color-card-hover); color: var(--color-text-primary); }
 
-.card-icon {
-  width: 22px;
-  height: 22px;
-  color: #FFF;
-  display: flex;
+/* ─── Search results ─── */
+.search-results {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 12px; overflow: hidden;
 }
+.search-result-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 12px 16px; cursor: pointer;
+  transition: background 0.1s;
+}
+.search-result-item:hover { background: var(--color-card-hover); }
+.sr-icon { width: 18px; height: 18px; flex-shrink: 0; color: var(--color-accent); display: flex; }
+.sr-icon :deep(svg) { width: 100%; height: 100%; }
+.sr-label { font-size: 14px; font-weight: 600; color: var(--color-text-primary); white-space: nowrap; }
+.sr-desc { font-size: 12px; color: var(--color-text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.search-empty { text-align: center; padding: 24px; color: var(--color-text-tertiary); font-size: 14px; }
 
-.card-icon :deep(svg) {
-  width: 100%;
-  height: 100%;
-}
-
-.card-body {
-  flex: 1;
-  min-width: 0;
-}
-
-.card-title {
-  font-size: 16px;
-  font-weight: 700;
-  color: var(--color-text-primary, #2D2528);
-  margin-bottom: 3px;
-  line-height: 1.3;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-/* 描述文字 line-clamp：保证卡片等高、信息密度均匀 */
-.card-desc {
-  font-size: 13px;
-  color: var(--color-text-secondary, #6A5A60);
-  line-height: 1.4;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
-.card-chevron {
-  width: 18px;
-  height: 18px;
-  flex-shrink: 0;
-  color: var(--color-text-tertiary, #A8989E);
-  display: flex;
-  transition: transform 0.2s;
-}
-
-.tool-card:hover .card-chevron {
-  transform: translateX(3px);
-  color: var(--color-accent, #E85D75);
-}
-
-.card-chevron :deep(svg) {
-  width: 100%;
-  height: 100%;
-}
-
-/* ─── 快捷键速查区 ─── */
-.shortcuts-section {
-  width: 100%;
-  padding: 20px;
-  background: var(--color-surface, #FFF);
-  border: 1px solid var(--color-border, rgba(232,93,117,0.08));
-  border-radius: 14px;
-}
+/* ═══ Section common ═══ */
+.section { margin-top: 18px; }
 
 .section-header {
+  display: flex; align-items: center; gap: 8px; margin-bottom: 10px;
+}
+.section-header.collapsible { cursor: pointer; user-select: none; }
+.section-icon { width: 16px; height: 16px; flex-shrink: 0; display: flex; }
+.section-icon :deep(svg) { width: 100%; height: 100%; }
+.section-title {
+  font-size: 12px; font-weight: 600; color: var(--color-text-secondary);
+  text-transform: uppercase; letter-spacing: 0.4px; flex: 1;
+}
+.section-count {
+  font-size: 11px; font-family: var(--font-mono);
+  color: var(--color-text-tertiary); background: var(--color-input-bg);
+  padding: 1px 6px; border-radius: 6px;
+}
+.section-action {
+  font-size: 11px; color: var(--color-text-tertiary); background: none; border: none;
+  cursor: pointer; padding: 2px 6px; border-radius: 4px;
+}
+.section-action:hover { color: var(--color-accent); background: var(--color-card-hover); }
+
+.collapse-arrow {
+  width: 14px; height: 14px; color: var(--color-text-tertiary); display: flex;
+  transition: transform 0.2s ease;
+}
+.collapse-arrow.open { transform: rotate(90deg); }
+
+/* ═══ Recent tools ═══ */
+.recent-row {
+  display: flex; gap: 8px; flex-wrap: wrap;
+}
+.recent-chip {
+  display: flex; align-items: center; gap: 6px;
+  padding: 6px 12px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  cursor: pointer; font-family: inherit; font-size: 13px;
+  color: var(--color-text-primary);
+  transition: all 0.15s ease;
+  white-space: nowrap; /* prevent chip break */
+}
+.recent-chip:hover {
+  border-color: var(--color-accent-light);
+  background: var(--color-card-hover);
+}
+.recent-chip-icon { width: 14px; height: 14px; display: flex; color: var(--color-accent); }
+.recent-chip-icon :deep(svg) { width: 100%; height: 100%; }
+.recent-chip-label { font-weight: 500; }
+.recent-chip-time {
+  font-size: 11px; color: var(--color-text-tertiary); margin-left: 2px;
+}
+.recent-empty {
+  display: flex; align-items: center; gap: 8px;
+  padding: 14px 0; color: var(--color-text-tertiary);
+}
+.recent-empty .section-icon { opacity: 0.5; }
+.recent-empty-text { font-size: 13px; }
+
+/* ═══ Category tool grid (UNIFIED: hero span2 / normal span1 / auto-fill) ═══ */
+.category-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 10px;
+}
+
+/* ─── Tool card base ─── */
+.tool-card {
+  display: flex; align-items: center; gap: 12px;
+  padding: 14px 14px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+  position: relative;
+  overflow: hidden;
+
+  /* Stagger entrance animation */
+  animation: card-enter 0.35s ease both;
+  animation-delay: var(--card-delay, 0ms);
+}
+@keyframes card-enter {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ─── Tool card hero (pinned tools) ─── */
+.tool-card.hero {
+  grid-column: span 2;
+  padding: 18px 18px;
+  border-radius: 12px;
+}
+.tool-card.hero .card-title { font-size: 17px; }
+.tool-card.hero .card-icon-wrap { width: 48px; height: 48px; border-radius: 14px; }
+.tool-card.hero .card-icon { width: 24px; height: 24px; }
+.tool-card.hero .card-chevron { width: 18px; height: 18px; }
+
+/* ─── Tool card hover ─── */
+.tool-card:hover {
+  border-color: var(--color-accent-light);
+  box-shadow: 0 4px 16px var(--color-shadow);
+  transform: translateY(-2px);
+}
+.tool-card:hover .card-icon-wrap {
+  transform: translateY(-1px) scale(1.05);
+}
+.tool-card:hover .card-chevron {
+  transform: translateX(4px);
+  opacity: 1;
+}
+
+/* ─── Card icon wrap (size + category color) ─── */
+.card-icon-wrap {
+  width: 40px; height: 40px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 10px;
+  transition: transform 0.2s ease;
+}
+.card-icon { width: 20px; height: 20px; color: #FFF; display: flex; }
+.card-icon :deep(svg) { width: 100%; height: 100%; }
+
+/* ─── Card body ─── */
+.card-body { flex: 1; min-width: 0; }
+.card-title { font-size: 15px; font-weight: 700; color: var(--color-text-primary); margin-bottom: 2px; line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.card-desc { font-size: 12px; color: var(--color-text-secondary); line-height: 1.4; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; }
+
+/* ─── Card chevron (slides right on hover) ─── */
+.card-chevron {
+  width: 14px; height: 14px; flex-shrink: 0;
+  color: var(--color-text-tertiary);
+  opacity: 0.3;
+  transition: transform 0.2s ease, opacity 0.2s ease;
   display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 14px;
 }
+.card-chevron :deep(svg) { width: 100%; height: 100%; }
 
-.section-icon {
-  width: 18px;
-  height: 18px;
-  color: var(--color-accent, #E85D75);
-  display: flex;
+/* ═══ System tools ─── */
+.system-section {
+  padding: 16px 0;
+  border-top: 1px solid var(--color-border);
 }
-
-.section-icon :deep(svg) {
-  width: 100%;
-  height: 100%;
+.system-row {
+  display: flex; gap: 10px; flex-wrap: wrap;
 }
-
-.shortcuts-section .section-title {
-  margin: 0;
+.system-chip {
+  display: flex; align-items: center; gap: 6px;
+  padding: 8px 14px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  cursor: pointer; font-family: inherit; font-size: 13px;
+  color: var(--color-text-secondary);
+  transition: all 0.15s ease;
 }
+.system-chip:hover {
+  border-color: var(--color-accent-light);
+  color: var(--color-text-primary);
+  background: var(--color-card-hover);
+}
+.system-chip-icon { width: 14px; height: 14px; display: flex; }
+.system-chip-icon :deep(svg) { width: 100%; height: 100%; }
+.system-chip-label { font-weight: 500; }
 
+/* ═══ Shortcuts ─── */
+.shortcuts-section {
+  padding: 16px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+}
 .shortcuts-list {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 10px;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 8px;
 }
+.shortcut-item { display: flex; align-items: center; gap: 8px; }
+.shortcut-desc { font-size: 13px; color: var(--color-text-secondary); }
 
-.shortcut-item {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.shortcut-desc {
-  font-size: 13px;
-  color: var(--color-text-secondary, #6A5A60);
+/* ═══ Reduced motion ═══ */
+@media (prefers-reduced-motion: reduce) {
+  .tool-card { animation: none; opacity: 1; transform: none; }
+  .tool-card:hover { transform: none; }
+  .card-icon-wrap { transition: none; }
+  .tool-card:hover .card-icon-wrap { transform: none; }
+  .card-chevron { transition: none; }
+  .tool-card:hover .card-chevron { transform: none; }
 }
 </style>

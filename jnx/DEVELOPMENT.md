@@ -1,6 +1,6 @@
-# JNX 开发指南
+# jnx 开发指南
 
-JNX 是一个基于 Tauri v2 + Vue 3 + TypeScript 的桌面开发者工具箱，提供 JSON 工具、HTTP 请求、格式互转、剪贴板历史、cURL 解析、Cron 表达式生成等功能。仓库根在 `jnx/` 的上层目录（即 Git 仓库根），实际应用源码在 `jnx/` 子目录内。
+jnx 是一个基于 Tauri v2 + Vue 3 + TypeScript 的桌面开发者工具箱，提供 JSON 工具、HTTP 请求、剪贴板历史等功能。仓库根在 `jnx/` 的上层目录（即 Git 仓库根），实际应用源码在 `jnx/` 子目录内。
 
 仓库地址：<https://github.com/JNNarrator/jnx>
 
@@ -22,7 +22,7 @@ JNX 是一个基于 Tauri v2 + Vue 3 + TypeScript 的桌面开发者工具箱，
 | Rust 依赖 | reqwest 0.12, serde, tauri-plugin-* | HTTP 请求、快捷键、系统信息等 |
 | 快捷键 | 自研 `useKeyboardShortcut` 系统 | 平台感知（mod = ⌘/Ctrl）、可自定义覆盖、冲突检测 |
 | 字体 | **JetBrains Mono**（本地 woff2 自托管） | `@font-face` 在 `assets/styles/fonts.css` 声明，`main.ts` 引入；Naive UI themeOverrides 同步注入 |
-| CI/CD | **GitHub Actions** | macOS（universal 双架构）与 Windows（x86_64）两条流水线，`tauri-action` 构建并发布草稿 Release |
+| CI/CD | **GitHub Actions** | macOS（aarch64 + x86_64）与 Windows（x86_64）两条流水线，`tauri-action` 构建并发布草稿 Release |
 
 ---
 
@@ -31,7 +31,7 @@ JNX 是一个基于 Tauri v2 + Vue 3 + TypeScript 的桌面开发者工具箱，
 ```
 jnx/                           # Git 仓库根
 ├── .github/workflows/         # CI 流水线
-│   ├── build-macos.yml        # macOS universal（ARM + Intel 合并）
+│   ├── build-macos.yml        # macOS aarch64 + x86_64 双架构构建
 │   └── build-windows.yml      # Windows x86_64 构建
 ├── .gitignore                 # 根级忽略（排除截图、node_modules、target、移动端图标等）
 └── jnx/                       # Tauri + Vue 应用源码（所有开发都在这里）
@@ -53,18 +53,16 @@ jnx/
 │   │   ├── JsonEditor.vue      # JSON 代码编辑器
 │   │   ├── JsonTree.vue        # JSON 树形浏览器 + 搜索
 │   │   ├── HeaderEditor.vue    # HTTP 请求头编辑器
-│   │   ├── CodeEditor.vue      # 通用代码编辑器（语法高亮 + 行号，用于 Converter / Cron / Curl）
 │   │   ├── DraggableSplitter.vue # 可拖拽分隔条
 │   │   └── Kbd.vue             # 快捷键展示组件（读运行时真实绑定）
 │   ├── views/                  # 页面视图
-│   │   ├── HomeView.vue        # 首页（快捷入口 + 快捷键速查，速查读真实键位）
-│   │   ├── ToolJson.vue        # JSON 工具（格式化/压缩/校验/树浏览）
-│   │   ├── ToolCurl.vue        # HTTP 请求工具（cURL 导入/请求构建/响应预览）
-│   │   ├── ToolClipboard.vue   # 剪贴板历史（轮询监控/固定/搜索/清空）
-│   │   ├── ToolConverter.vue   # 格式互转（JSON/YAML/TOML/XML/CSV/Properties）
-│   │   ├── JsonJavabean.vue    # JSON ⇄ JavaBean 互转
-│   │   ├── ToolCron.vue        # Cron 表达式可视化生成器
-│   │   ├── ToolSettings.vue    # 设置页（主题/标签栏/剪贴板/快捷键自定义）
+│   │   ├── HomeView.vue        # 首页（分层布局：搜索 / 最近使用 / 分类网格 / 快捷键速查）
+│   │   ├── ToolJson.vue        # JSON 工具
+│   │   ├── ToolCurl.vue        # HTTP 请求工具
+│   │   ├── ToolClipboard.vue   # 剪贴板历史
+│   │   ├── ToolConverter.vue   # 格式互转（JSON/YAML/TOML/XML/CSV）
+│   │   ├── ToolCron.vue        # Cron 表达式可视化
+│   │   ├── ToolSettings.vue    # 设置页（主题/标签栏/剪贴板）
 │   │   └── ToolShortcuts.vue   # 快捷键自定义页（录制/冲突检测/恢复默认）
 │   ├── stores/                 # Pinia 状态管理
 │   │   ├── tools.ts            # 工具标签管理（打开/关闭/激活）
@@ -78,21 +76,16 @@ jnx/
 │   │   ├── useHttpSend.ts      # HTTP 发送（invoke custom_fetch）
 │   │   ├── useKeyboardShortcut.ts # 快捷键引擎（注册中心/分发/更新/调试日志）
 │   │   ├── usePlatform.ts      # 平台检测（mac/win，UA 兜底 + Tauri OS 插件修正）
-│   │   ├── useRecentTools.ts   # 最近使用工具追踪（首页排序/建议）
-│   │   └── useToolDraft.ts     # 工具页面草稿保存/恢复（Editor 内内容暂存）
+│   │   ├── useRecentTools.ts   # 最近使用工具（localStorage 持久化）
+│   │   └── useToolDraft.ts     # 工具草稿自动清理
 │   ├── shortcuts/              # 快捷键定义
 │   │   ├── index.ts            # SHORTCUTS 映射表 + 分组 + HOME_CHEATSHEET
 │   │   └── types.ts            # Chord / PlatformChords / Mod 类型
 │   ├── types/                  # TypeScript 类型定义
-│   │   └── index.ts            # ToolTab, Settings, ClipboardItem, FlatJsonNode 等
+│   │   └── index.ts            # ToolTab（含 category/order/keywords/isSystem）, Settings, ClipboardItem, FlatJsonNode, CATEGORY_META
 │   ├── utils/                  # 工具函数
 │   │   ├── db.ts               # SQLite 数据库操作（设置/剪贴板 CRUD）
-│   │   ├── parseCurl.ts        # cURL 命令解析器
-│   │   ├── cron.ts             # Cron 表达式校验与人类可读描述
-│   │   ├── javaLightParser.ts  # 轻量 Java 代码解析器（字段/类型提取）
-│   │   ├── javaToJson.ts       # JavaBean → JSON 转换
-│   │   ├── jsonToJava.ts       # JSON → JavaBean 转换
-│   │   └── naming.ts           # 命名转换（camelCase/snake_case/PascalCase 等）
+│   │   └── parseCurl.ts        # cURL 命令解析器
 │   ├── assets/                 # 静态资源
 │   │   ├── fonts/              # JetBrains Mono woff2 字体文件（SIL Open Font License 1.1，自托管）
 │   │   └── styles/
@@ -119,7 +112,7 @@ jnx/
 
 | Store | 职责 | 关键状态 | 持久化 |
 |-------|------|---------|--------|
-| **tools** | 标签页管理 | activeTabId, openTabIds | 否（内存） |
+| **tools** | 标签页管理 + 最近使用记录 | activeTabId, openTabIds, setActiveTab 自动调用 recordToolUse | 否（内存） |
 | **settings** | 应用设置 | values (reactive) | SQLite settings 表 |
 | **clipboard** | 剪贴板历史 | items[], watching | SQLite clipboard_history 表 |
 | **http** | HTTP 请求构建 | request, response | 否（内存） |
@@ -132,6 +125,7 @@ jnx/
 - 设置变更通过 `settings.update()` → `setSetting()` 自动持久化
 - 剪贴板轮询在 Tauri 环境下自动启动，通过 `setInterval` 调用 `@tauri-apps/plugin-clipboard-manager`
 - HTTP 请求通过 `invoke('custom_fetch')` 调用 Rust 后端，绕过 CORS
+- 最近工具使用记录由 `useRecentTools` composable 管理（localStorage `jnx:recent-tools`，不经过 SQLite）
 
 ---
 
@@ -230,24 +224,8 @@ jnx/
 - 三个入口都接同一个 `openPalette()`：`⌘K`/`Ctrl+K`、TopBar 搜索框 `@click`、命令面板 toggle
 - 面板打开后自动 focus 输入框；`Esc` 关闭、遮罩点击关闭、`↑↓` 选择、`Enter` 执行
 - z-index `99999`，`position: fixed` 居中
-- `commandPalette` store 的 `register()` 在 `useAppShortcuts` 启动时填入可搜索动作
+- `commandPalette` store 的 `register()` 在 `useAppShortcuts` 启动时填入可搜索动作；关键字从 `ALL_TOOLS` 各工具的 `keywords` 字段自动派生
 - 空查询显示全部；输入即过滤 `label`/`id`/`keywords`
-
----
-
-## 工具页一览
-
-| 页面 | 路径 | 功能 |
-|------|------|------|
-| 首页 | `HomeView.vue` | 快捷入口 + 快捷键速查 + 最近工具 |
-| JSON 工具 | `ToolJson.vue` | 格式化/压缩/校验/树状浏览 + 搜索 |
-| HTTP 请求 | `ToolCurl.vue` | cURL 导入 / 请求构建（GET/POST/...）/ 响应预览 |
-| 格式互转 | `ToolConverter.vue` | JSON ↔ YAML ↔ TOML ↔ XML ↔ CSV ↔ Properties 互转 |
-| JSON↔JavaBean | `JsonJavabean.vue` | JSON ↔ JavaBean 双向转换 |
-| Cron | `ToolCron.vue` | Cron 表达式可视化生成器 + 人类可读描述 |
-| 剪贴板 | `ToolClipboard.vue` | 剪贴板历史（轮询/固定/搜索/清空，可滚动） |
-| 设置 | `ToolSettings.vue` | 主题 / 标签栏行为 / 剪贴板轮询间隔 |
-| 快捷键 | `ToolShortcuts.vue` | 快捷键覆盖自定义（录制/冲突检测/恢复默认） |
 
 ---
 
@@ -297,53 +275,22 @@ CREATE TABLE clipboard_history (
 
 | Workflow | Runner | 构建目标 | 产物 |
 |----------|--------|---------|------|
-| `build-macos.yml` | `macos-latest` | `universal-apple-darwin`（ARM + Intel lipo 合并） | `.dmg` / `.app.tar.gz` |
+| `build-macos.yml` | `macos-latest` | `aarch64-apple-darwin` + `x86_64-apple-darwin` | `.dmg` / `.app.tar.gz` |
 | `build-windows.yml` | `windows-latest` | `x86_64-pc-windows-msvc` | `.msi` / `-setup.exe` |
 
 - 触发：push 到 `master`/`main`、PR、`workflow_dispatch`
 - 两条流水线均声明 `permissions: contents: write`（供 `tauri-action` 创建 Release）
-- Rust target 显式列出（macOS 需同时安装 `aarch64-apple-darwin` + `x86_64-apple-darwin` 以支持 universal 合并）
+- Rust target 显式列出（macOS 双架构）
 - Cargo 与 npm 缓存
-- `tauri-action` 使用唯一 tag `v0.1.${{ github.run_number }}` 创建草稿 Release 并挂载安装包；`upload-artifact` 同时把产物留一份在 Actions 页
-- 产物路径含 target triple 层：`src-tauri/target/{triple}/release/bundle/...`，artifact globs 用 `target/*/release/bundle/**` 或显式写 triple
+- 打 tag 时 `tauri-action` 自动创建草稿 Release 并挂载安装包；`upload-artifact` 同时把产物留一份在 Actions 页
+- 产物路径含 target triple 层：`src-tauri/target/{triple}/release/bundle/...`，artifact globs 用 `target/*/release/bundle/**`
 
-### 已踩过的 CI 坑
+### 已踩过的坑
 
-1. **Windows `icon.ico` RC2176（old DIB）**：用 `npx @tauri-apps/cli icon <png>` 重新生成含 PNG 条目的 ico
-2. **macOS Release 创建失败 `Resource not accessible by integration`**：流水线需加 `permissions: contents: write`
-3. **macOS `Target x86_64-apple-darwin is not installed`**：`dtolnay/rust-toolchain` 需 `with: targets: aarch64-apple-darwin,x86_64-apple-darwin`
-4. **Windows artifact 路径漏 target triple**：用 `--target` 构建时产物在 `target/{triple}/release/`，不是 `target/release/`
-5. **macOS 双步骤 + 同 tagName 导致 ReleaseAsset already_exists**：arm64 和 x86_64 分两步调用 `tauri-action` 时，第二步（x86_64）与第一步（arm64）用同一个 `tagName`，无法创建第二个 release。**修复方案**：改用 `--target universal-apple-darwin` 一次构建（Tauri 自动 lipo 合并两个架构），只调用一次 `tauri-action`
-6. **`tagName: ${{ github.ref_name }}` 在 push 到 master 分支时解析为 `master`**：字符串 `master` 作为 tag name 不唯一，且可能和远程已存在的 `master` tag 或草稿 Release 冲突。**修复方案**：改为 `v0.1.${{ github.run_number }}`，每个 workflow run 唯一的 tag
-7. **同一 repo 内有 `master` tag 和 `master` branch 同时存在**：git push 时 refname 歧义。**修复方案**：删除远程 `master` tag（`git push origin --delete refs/tags/master`），用 release tag 替代（如 `v0.1.x`）
-
----
-
-## 2026-07-21 今日变动摘要
-
-### 新功能
-- **格式互转页面** (`ToolConverter.vue`)：JSON / YAML / TOML / XML / CSV / .properties 六种格式互转
-- **JSON ↔ JavaBean 转换** (`JsonJavabean.vue`)：双向转换，支持嵌套对象、数组、类型推断
-- **Cron 表达式生成器** (`ToolCron.vue`)：可视化生成 + 人类可读描述
-- **通用代码编辑器** (`CodeEditor.vue`)：语法高亮 + 行号，被 Converter / Cron / Curl 复用
-
-### 新 工具/组合函数
-- `utils/cron.ts` — Cron 表达式校验和描述
-- `utils/javaLightParser.ts` — 轻量级 Java 源码解析（字段/类型/泛型提取）
-- `utils/javaToJson.ts` / `utils/jsonToJava.ts` — JavaBean ↔ JSON 转换引擎
-- `utils/naming.ts` — 命名风格转换（camelCase / PascalCase / snake_case / kebab-case）
-- `composables/useRecentTools.ts` — 最近工具追踪，首页排序建议
-- `composables/useToolDraft.ts` — 编辑器草稿保存/恢复
-
-### 关键修复
-- **剪贴板滚动失效**：`ToolClipboard.vue` 内 `NSpin` 容器缺少 `flex-direction: column + min-height: 0`，导致 flex 子项无法滚动。根因：Naive UI `NSpin` 包了一层 `.n-spin-content`，flex 容器默认 `min-height: auto` 截断了滚动链
-- **JSON 高亮标签泄漏/空格丢失**：JSON 树高亮实现中正则未正确处理转义字符和空白符边界，导致 HTML 标签泄漏到视图
-- **light 主题文字对比度**：`App.vue` light 主题块文本色阶校准，`ToolSettings.vue` 文字变量接全局色阶
-
-### CI/CD 踩坑（见上方「已踩过的 CI 坑」第 3–7 条）
-- 从双步骤分架构构建切换为 universal 构建
-- 从 `github.ref_name` 切换为 `github.run_number` 做 tag 名
-- 修复了 Windows artifact 上传路径
+- **Windows `icon.ico` RC2176（old DIB）**：用 `npx @tauri-apps/cli icon <png>` 重新生成含 PNG 条目的 ico
+- **macOS Release 创建失败 `Resource not accessible by integration`**：流水线需加 `permissions: contents: write`
+- **macOS `Target x86_64-apple-darwin is not installed`**：`dtolnay/rust-toolchain` 需 `with: targets: aarch64-apple-darwin,x86_64-apple-darwin`
+- **Windows artifact 路径漏 target triple**：用 `--target` 构建时产物在 `target/{triple}/release/`，不是 `target/release/`
 
 ---
 
@@ -363,9 +310,9 @@ CREATE TABLE clipboard_history (
 ## 添加新工具页
 
 1. 在 `src/views/` 下创建 `ToolXxx.vue`
-2. 在 `src/types/index.ts` 的 `ALL_TOOLS` 中添加 `ToolTab` 定义
+2. 在 `src/types/index.ts` 的 `ALL_TOOLS` 中添加 `ToolTab` 定义（含 `category`/`order`/`keywords`/`isSystem`；`pinned=true` 在首页获得 hero 卡片样式）
 3. 在 `src/App.vue` 的 `componentMap` 中注册组件
-4. 在 `src/components/Sidebar.vue` 的 `navItems` 中添加导航项
+4. Sidebar 与首页工具网格自动从 ALL_TOOLS 派生——不需手动编辑导航列表
 5. 在 `src/composables/useAppShortcuts.ts` 中添加导航快捷键（可选）
 6. 需要 Rust 侧依赖时编辑 `src-tauri/Cargo.toml`
 
@@ -382,4 +329,3 @@ CREATE TABLE clipboard_history (
 - HTTP 请求用 `useHttpSend` composable，不直接前端 `fetch`
 - 命名规范：PascalCase 组件/类型，camelCase 变量/函数，kebab-case CSS class
 - 主题值只能是 `'light' | 'dark'`，新增主题需同步改 `Settings` 类型、`App.vue` 主题分支与 `ToolSettings` 选项，并删除对旧值的引用（避免 `cycleTheme`/命令面板写入失效值）
-- NSpin 内包裹可滚动内容时，需确保 flex 链每层都有 `min-height: 0`，否则滚动失效

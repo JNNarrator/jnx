@@ -24,6 +24,7 @@ export function useAppShortcuts() {
   useKeyboardShortcut('nav.toClipboard',    () => tools.setActiveTab('clipboard'))
   useKeyboardShortcut('nav.toSettings',     () => tools.setActiveTab('settings'))
   useKeyboardShortcut('nav.toShortcuts',    () => tools.setActiveTab('shortcuts'))
+  useKeyboardShortcut('nav.toCron',          () => tools.setActiveTab('cron'))
   useKeyboardShortcut('nav.toConverter',    () => tools.setActiveTab('converter'))
   useKeyboardShortcut('theme.cycle',        () => cycleTheme(settings))
 
@@ -59,6 +60,7 @@ export function useCommandPaletteActions() {
     { id: 'nav.http',      label: 'HTTP 请求',    category: '导航', keywords: ['http', 'curl', '请求'], action: () => tools.setActiveTab('curl') },
     { id: 'nav.converter', label: '格式互转',     category: '导航', keywords: ['converter', '格式', '转换', 'yaml', 'toml', 'xml', 'csv'], action: () => tools.setActiveTab('converter') },
     { id: 'nav.clipboard', label: '剪贴板',       category: '导航', keywords: ['clipboard', '剪贴板'], action: () => tools.setActiveTab('clipboard') },
+      { id: 'nav.cron',      label: 'Cron 表达式',   category: '导航', keywords: ['cron', 'Cron', '表达式', '定时'], action: () => tools.setActiveTab('cron') },
     { id: 'nav.settings',  label: '设置',         category: '导航', keywords: ['settings', '设置'], action: () => tools.setActiveTab('settings') },
     { id: 'nav.shortcuts', label: '快捷键',       category: '导航', keywords: ['shortcuts', '快捷键'], action: () => tools.setActiveTab('shortcuts') },
     { id: 'theme.light',   label: '主题：浅色',    category: '动作', keywords: ['theme', 'light', '浅色'], action: () => settings.update('theme', 'light') },

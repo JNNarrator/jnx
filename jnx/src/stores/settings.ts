@@ -14,8 +14,13 @@ export const useSettingsStore = defineStore('settings', () => {
     const raw = await getAllSettings()
     for (const [key, val] of Object.entries(raw)) {
       if (key in values) {
-        const num = Number(val)
-        ;(values as any)[key] = Number.isNaN(num) ? val : num
+        if (key === 'tool_memory_enabled' || key === 'sidebarCollapsed') {
+          // 布尔值特殊处理
+          ;(values as any)[key] = val === 'true'
+        } else {
+          const num = Number(val)
+          ;(values as any)[key] = Number.isNaN(num) ? val : num
+        }
       }
     }
     // Normalize theme value from string
@@ -25,7 +30,7 @@ export const useSettingsStore = defineStore('settings', () => {
     loaded = true
   }
 
-  async function update(key: string, value: string | number) {
+  async function update(key: string, value: string | number | boolean) {
     ;(values as any)[key] = value
     await setSetting(key, String(value))
   }

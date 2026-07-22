@@ -1,21 +1,65 @@
 <script setup lang="ts">
+import { defineOptions } from 'vue'
 import { computed, ref, shallowRef, watch } from 'vue'
 import { NSelect, NSwitch, NButton, useMessage } from 'naive-ui'
 import CodeEditor from '../components/CodeEditor.vue'
 import { convert, FORMAT_META, lossyHint, type ConvertResult, type DataFormat } from '../utils/converter'
+import { useToolDraft } from '../composables/useToolDraft'
+
+defineOptions({ name: 'ToolConverter' })
 
 const msg = useMessage()
 const FORMATS = Object.keys(FORMAT_META) as DataFormat[]
 const fmtOptions = FORMATS.map(f => ({ label: FORMAT_META[f].displayName, value: f }))
 
-const fromFmt = ref<DataFormat>('json')
-const toFmt = ref<DataFormat>('yaml')
-const input = ref('')
+interface ToolConverterDraft {
+  inputText: string
+  sourceFmt: DataFormat
+  targetFmt: DataFormat
+  liveMode: boolean
+  autoFlatten: boolean
+}
+
+const { state: draft, resetDraft } = useToolDraft<ToolConverterDraft>('converter', {
+  inputText: '',
+  sourceFmt: 'json',
+  targetFmt: 'yaml',
+  liveMode: true,
+  autoFlatten: false,
+}, {
+  validate: (raw): raw is ToolConverterDraft => {
+    return typeof raw === 'object' && raw !== null
+      && typeof (raw as any).inputText === 'string'
+      && typeof (raw as any).sourceFmt === 'string'
+      && typeof (raw as any).targetFmt === 'string'
+      && typeof (raw as any).liveMode === 'boolean'
+      && typeof (raw as any).autoFlatten === 'boolean'
+  },
+})
+
+const fromFmt = computed({
+  get: () => draft.value.sourceFmt,
+  set: (v: DataFormat) => { draft.value = { ...draft.value, sourceFmt: v } },
+})
+const toFmt = computed({
+  get: () => draft.value.targetFmt,
+  set: (v: DataFormat) => { draft.value = { ...draft.value, targetFmt: v } },
+})
+const input = computed({
+  get: () => draft.value.inputText,
+  set: (v: string) => { draft.value = { ...draft.value, inputText: v } },
+})
+const liveMode = computed({
+  get: () => draft.value.liveMode,
+  set: (v: boolean) => { draft.value = { ...draft.value, liveMode: v } },
+})
+const autoFlatten = computed({
+  get: () => draft.value.autoFlatten,
+  set: (v: boolean) => { draft.value = { ...draft.value, autoFlatten: v } },
+})
 const output = shallowRef('')
 const parseErr = ref<ConvertResult | null>(null)
 const stringifyErr = ref<ConvertResult | null>(null)
-const liveMode = ref(true)
-const autoFlatten = ref(false)
 const elapsed = ref(0)
 const busy = ref(false)
 
@@ -24,11 +68,14 @@ const inputCount = computed(() => input.value.length)
 
 let timer: ReturnType<typeof setTimeout> | null = null
 
+function normalizeQuotes(s: string) { return s.replace(/[\u201C\u201D\u201E\u201F\u2018\u2019]/g, '"') }
+
 function runConvert() {
-  if (!input.value.trim()) { output.value = ''; parseErr.value = null; stringifyErr.value = null; return }
+  const cleaned = normalizeQuotes(input.value)
+  if (!cleaned.trim()) { output.value = ''; parseErr.value = null; stringifyErr.value = null; return }
   busy.value = true
   const start = performance.now()
-  const res = convert(input.value, fromFmt.value, toFmt.value, { autoFlatten: autoFlatten.value })
+  const res = convert(cleaned, fromFmt.value, toFmt.value, { autoFlatten: autoFlatten.value })
   elapsed.value = Math.round((performance.now() - start) * 1000) / 1000
   busy.value = false
   if (res.ok) {
@@ -54,9 +101,12 @@ function swap() {
   if (output.value) { input.value = output.value; output.value = '' }
   runConvert()
 }
-function clearAll() { input.value = ''; output.value = ''; parseErr.value = null; stringifyErr.value = null }
+function clearAll() {
+  output.value = ''; parseErr.value = null; stringifyErr.value = null
+  resetDraft()
+}
 function formatInput() {
-  const res = convert(input.value, fromFmt.value, fromFmt.value, { autoFlatten: autoFlatten.value })
+  const res = convert(normalizeQuotes(input.value), fromFmt.value, fromFmt.value, { autoFlatten: autoFlatten.value })
   if (res.ok) { input.value = res.text; parseErr.value = null }
   else { parseErr.value = res; msg.warning('格式化失败：' + res.message) }
 }
@@ -72,6 +122,8 @@ function errText(e: ConvertResult): string {
   }
  return ''
 }
+
+
 
 </script>
 
@@ -102,7 +154,7 @@ function errText(e: ConvertResult): string {
           <span>输入 · {{ FORMAT_META[fromFmt].displayName }}</span>
           <span class="cv-meta">{{ inputCount }} 字符</span>
         </div>
-        <CodeEditor v-model="input" :language="fromFmt" placeholder="粘贴或在此输入…" />
+        <CodeEditor v-model="input" :language="fromFmt === 'properties' ? 'properties' : fromFmt === 'csv' ? 'csv' : fromFmt" placeholder="粘贴或在此输入…" />
         <div v-if="parseErr" class="cv-err">{{ errText(parseErr!) }}</div>
       </div>
       <div class="cv-col">
@@ -113,7 +165,7 @@ function errText(e: ConvertResult): string {
             {{ elapsed }} ms
           </span>
         </div>
-        <CodeEditor :model-value="output" :language="toFmt" readonly placeholder="转换结果…" />
+        <CodeEditor :model-value="output" :language="toFmt === 'properties' ? 'properties' : toFmt === 'csv' ? 'csv' : toFmt" readonly placeholder="转换结果…" />
         <div v-if="stringifyErr" class="cv-err">{{ errText(stringifyErr!) }}</div>
       </div>
     </div>

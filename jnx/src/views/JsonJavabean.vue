@@ -4,7 +4,7 @@
  * 方向 B：Java 类源码 → 示例 JSON（轻量解析 + 类型→示例值 + 循环引用截断）
  */
 
-
+import { defineOptions } from 'vue'
 import { computed, ref, watch, shallowRef } from 'vue'
 import { NSelect, NSwitch, NButton, NInput, NCollapse, NCollapseItem, useMessage } from 'naive-ui'
 import { useToolDraft } from '../composables/useToolDraft'
@@ -20,6 +20,13 @@ import { jsonToJava, type GenOptions } from '../utils/jsonToJava'
 import { javaToJson, type JavaToJsonOptions } from '../utils/javaToJson'
 
 defineOptions({ name: 'JsonJavabean' })
+
+function stripHtml(s: string): string {
+  return s
+    .replace(/<[^>]*>/g, '')                // full tags: <span class="hl-...">, </span>
+    .replace(/"hl-\w+"?>/g, '')             // attribute remnant: "hl-keyword"> or "hl-keyword">
+    .replace(/&quot;hl-\w+&quot;>/g, '')    // entity-escaped: &quot;hl-keyword&quot;>
+}
 
 interface JsonJavabeanDraft {
   jsonText: string
@@ -48,11 +55,11 @@ const { state: draft, resetDraft } = useToolDraft<JsonJavabeanDraft>('json-javab
 /* ─── 双向绑定 ─── */
 const jsonText = computed({
   get: () => draft.value.jsonText,
-  set: (v: string) => { draft.value = { ...draft.value, jsonText: v } },
+  set: (v: string) => { draft.value = { ...draft.value, jsonText: stripHtml(v) } },
 })
 const javaText = computed({
   get: () => draft.value.javaText,
-  set: (v: string) => { draft.value = { ...draft.value, javaText: v } },
+  set: (v: string) => { draft.value = { ...draft.value, javaText: stripHtml(v) } },
 })
 const direction = computed({
   get: () => draft.value.direction,
@@ -64,8 +71,7 @@ const opts = computed({
 })
 
 /* ─── 输出 ─── */
-/* output 移除：结果直接写入对侧栏 */
-let _skipWatch = false
+const output = shallowRef('')
 const error = shallowRef<string | null>(null)
 const busy = ref(false)
 
@@ -102,13 +108,18 @@ const OPT_META: Record<string, { label: string; affect: string; options: { label
 let debounceTimer: ReturnType<typeof setTimeout> | null = null
 
 async function doConvert() {
+  if (busy.value) return
   busy.value = true
   error.value = null
+
+  // Belt-and-suspenders: sanitize inputs before conversion
+  jsonText.value = stripHtml(jsonText.value)
+  javaText.value = stripHtml(javaText.value)
 
   try {
     if (direction.value === 'json2java') {
       const jsonInput = jsonText.value.trim()
-      if (!jsonInput) { error.value = null; busy.value = false; return }
+      if (!jsonInput) { output.value = ''; error.value = null; busy.value = false; return }
 
       const genOpts: GenOptions = {
         framework: framework.value,
@@ -125,13 +136,14 @@ async function doConvert() {
       const result = jsonToJava(jsonInput, genOpts)
 
       if (result.ok) {
-        _skipWatch = true; javaText.value = result.code; _skipWatch = false
+        output.value = result.code
       } else {
         error.value = result.message
+        output.value = ''
       }
     } else {
       const javaInput = javaText.value.trim()
-      if (!javaInput) { error.value = null; busy.value = false; return }
+      if (!javaInput) { output.value = ''; error.value = null; busy.value = false; return }
 
       const jsonOpts: JavaToJsonOptions = {
         exampleStyle: exampleStyle.value,
@@ -142,13 +154,15 @@ async function doConvert() {
       const result = javaToJson(javaInput, jsonOpts)
 
       if (result.ok) {
-        _skipWatch = true; jsonText.value = result.json; _skipWatch = false
+        output.value = result.json
       } else {
         error.value = result.message
+        output.value = ''
       }
     }
   } catch (e) {
     error.value = `转换异常：${e instanceof Error ? e.message : String(e)}`
+    output.value = ''
   } finally {
     busy.value = false
   }
@@ -168,9 +182,7 @@ function manualConvert() {
 /* ─── Auto-convert watch ─── */
 watch([jsonText, javaText, direction, framework, indentSize, numberStrategy,
        nullStrategy, fieldNaming, nestedMode, rootClassName, packageName,
-       lombok, lombokBuilder, exampleStyle, dateFormat, outputKeyStyle],
-  () => { if (!_skipWatch) scheduleConvert() },
-  { flush: 'post', deep: false })
+       lombok, lombokBuilder, exampleStyle, dateFormat, outputKeyStyle], scheduleConvert, { flush: 'post', deep: false })
 
 /* ─── 操作 ─── */
 
@@ -178,16 +190,25 @@ function swapContent() {
   const tmpJ = jsonText.value
   jsonText.value = javaText.value
   javaText.value = tmpJ
+  output.value = ''
+  error.value = null
+  direction.value = direction.value === 'json2java' ? 'java2json' : 'json2java'
+  manualConvert()
 }
 
 function clearAll() {
   jsonText.value = ''
   javaText.value = ''
+  output.value = ''
   error.value = null
   resetDraft()
 }
 
 function formatJson() {
+  if (direction.value !== 'json2java') {
+    msg.info('当前方向 JSON 面板为只读输出，不可格式化')
+    return
+  }
   try {
     const parsed = JSON.parse(jsonText.value)
     jsonText.value = JSON.stringify(parsed, null, indentSize.value)
@@ -198,12 +219,19 @@ function formatJson() {
 }
 
 function formatJava() {
+  if (direction.value !== 'java2json') {
+    msg.info('当前方向 Java 面板为只读输出，不可格式化')
+    return
+  }
   if (!javaText.value) { msg.info('Java 源码为空'); return }
   javaText.value = lightFormatJava(javaText.value, indentSize.value)
   msg.info('已执行轻量缩进规整（非完整 java-format）')
 }
 
-
+function copyOutput() {
+  if (!output.value) { msg.info('暂无输出可复制'); return }
+  navigator.clipboard.writeText(output.value).then(() => msg.success('已复制')).catch(() => msg.error('复制失败'))
+}
 
 /* ─── 填充示例 ─── */
 function fillJsonSample() {
@@ -267,9 +295,9 @@ public class User {
       <div class="jb-toolbar-left">
         <span class="jb-title">JSON ⇄ JavaBean</span>
         <NButton size="small" :type="direction === 'json2java' ? 'primary' : 'default'"
-          @click="direction = 'json2java'; doConvert()">➜ JSON → Java</NButton>
+          @click="direction = 'json2java'; manualConvert()">➜ JSON → Java</NButton>
         <NButton size="small" :type="direction === 'java2json' ? 'primary' : 'default'"
-          @click="direction = 'java2json'; doConvert()">➜ Java → JSON</NButton>
+          @click="direction = 'java2json'; manualConvert()">➜ Java → JSON</NButton>
       </div>
       <div class="jb-toolbar-right">
         <label class="jb-toggle"><NSwitch v-model:value="autoConvert" size="small" /><span class="jb-toggle-l">自动转换</span></label>
@@ -344,17 +372,25 @@ public class User {
     <!-- 错误提示 -->
     <div v-if="error" class="jb-error">{{ error }}</div>
 
-    <!-- 编辑器双栏 -->
+    <!-- 编辑器双栏（根据方向动态切换输入/输出） -->
     <div class="jb-pair">
       <div class="jb-col">
-        <CodeEditor v-model="jsonText" language="json" placeholder="粘贴或输入 JSON…" />
+        <div class="jb-col-h">
+          <span class="jb-col-title">{{ direction === 'json2java' ? 'JSON 输入' : 'JSON 输出' }}</span>
+          <NButton v-if="direction === 'java2json' && output" size="tiny" tertiary @click="copyOutput">复制</NButton>
+        </div>
+        <CodeEditor v-if="direction === 'json2java'" v-model="jsonText" language="json" placeholder="粘贴或输入 JSON…" />
+        <CodeEditor v-else :model-value="output" language="json" readonly placeholder="转换结果…" />
       </div>
       <div class="jb-col">
-        <CodeEditor v-model="javaText" language="java" placeholder="粘贴或输入 Java 源码…" />
+        <div class="jb-col-h">
+          <span class="jb-col-title">{{ direction === 'java2json' ? 'Java 输入' : 'Java 输出' }}</span>
+          <NButton v-if="direction === 'json2java' && output" size="tiny" tertiary @click="copyOutput">复制</NButton>
+        </div>
+        <CodeEditor v-if="direction === 'java2json'" v-model="javaText" language="java" placeholder="粘贴或输入 Java 源码…" />
+        <CodeEditor v-else :model-value="output" language="java" readonly placeholder="转换结果…" />
       </div>
     </div>
-
-
   </div>
 </template>
 
@@ -380,11 +416,13 @@ public class User {
 /* Error */
 .jb-error { font-size: 12px; color: var(--danger); padding: 6px 10px; background: color-mix(in srgb, var(--danger) 8%, transparent); border-radius: 6px; flex-shrink: 0; white-space: pre-wrap; }
 
+/* Column headers */
+.jb-col-h { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
+.jb-col-title { font-size: 12px; font-weight: 600; color: var(--color-text-secondary); }
+
 /* Editor pair */
 .jb-pair { flex: 1; min-height: 200px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 @media (max-width: 860px) { .jb-pair { grid-template-columns: 1fr; grid-template-rows: 1fr 1fr; } }
 .jb-col { display: flex; flex-direction: column; min-height: 0; }
-
-/* Output */
 
 </style>

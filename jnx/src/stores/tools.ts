@@ -2,17 +2,23 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import type { ToolTab } from '../types'
 import { ALL_TOOLS, HOME_TAB } from '../types'
+import { useRecentTools } from '../composables/useRecentTools'
 
 export const useToolsStore = defineStore('tools', () => {
   const allTabs = ref<ToolTab[]>([HOME_TAB, ...ALL_TOOLS])
   const tabs = ref<ToolTab[]>(ALL_TOOLS)
   const activeTabId = ref<string>('home')
   const openTabIds = ref<string[]>(['home'])
+  const { recordToolUse } = useRecentTools()
 
   function setActiveTab(id: string) {
     activeTabId.value = id
     if (id !== 'home' && !openTabIds.value.includes(id)) {
       openTabIds.value.push(id)
+    }
+    // 记录工具使用（首页不记录）
+    if (id !== 'home') {
+      recordToolUse(id)
     }
   }
 

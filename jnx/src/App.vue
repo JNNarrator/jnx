@@ -11,17 +11,25 @@ import ToolCurl from './views/ToolCurl.vue'
 import ToolClipboard from './views/ToolClipboard.vue'
 import ToolSettings from './views/ToolSettings.vue'
 import ToolShortcuts from './views/ToolShortcuts.vue'
+ import ToolCron from './views/ToolCron.vue'
 import JsonJavabean from './views/JsonJavabean.vue'
 import { useToolsStore } from './stores/tools'
 import { useSettingsStore } from './stores/settings'
 import { useShortcutBindingsStore } from './stores/shortcutBindings'
 import { useAppShortcuts, useCommandPaletteActions } from './composables/useAppShortcuts'
 import { usePlatform } from './composables/usePlatform'
+import { ALL_TOOLS } from './types'
+import { pruneAllDrafts } from './composables/useToolDraft'
 
 const tools = useToolsStore()
 const settings = useSettingsStore()
 const bindings = useShortcutBindingsStore()
 const { isWin } = usePlatform()
+
+// KeepAlive include list: cache only tool pages (exclude settings/shortcuts/home)
+const toolComponentNames = ALL_TOOLS
+  .filter(t => !['settings', 'shortcuts'].includes(t.id))
+  .map(t => t.component)
 
 const loaded = ref(false)
 
@@ -29,6 +37,7 @@ onMounted(async () => {
   try {
     await settings.load()
     await bindings.load()
+    try { pruneAllDrafts() } catch (_) { /* prune 纯增强，失败不影响启动 */ }
   } catch (_) { console.warn('后端不可用') }
   document.documentElement.setAttribute('data-platform', isWin.value ? 'windows' : 'macos')
   try { useCommandPaletteActions() } catch (_) { /* 非组件作用域兜底 */ }
@@ -45,10 +54,8 @@ watchEffect(() => {
   const t = settings.values.theme
 
   let bg='', surface='', sidebar='', topbar='', text1='', text2='', text3=''
-  let synConstant='', synKeyword='', synDecorator='', synType='', synAttr='', synTag='', synPunct=''
   let accent='', accentLight='', accentGlow='', border='', shadow='', cardHover='', grid='', inputBg=''
-  let surface2=''
-  let elevBg=''
+  let elevBg='', synAnnotation='', synType=''
 
   if (t === 'dark') {
     bg = '#161618'; surface = '#1E1E20'; sidebar = '#1A1A1C'; topbar = 'rgba(22,22,24,0.85)'
@@ -58,9 +65,8 @@ watchEffect(() => {
     border = 'rgba(255,255,255,0.08)'; shadow = 'rgba(0,0,0,0.2)'
     cardHover = 'rgba(255,255,255,0.04)'; grid = 'rgba(255,255,255,0.02)'; inputBg = 'rgba(255,255,255,0.04)'
     elevBg = '#3D3D3D'
-    surface2 = '#252528'
-    synConstant = '#7EC9A5'; synKeyword = '#6A9FCF'; synDecorator = '#C9A5D4'
-    synType = '#E5B97E'; synAttr = '#8FCAE5'; synTag = '#6A9FCF'; synPunct = '#8E8E96'
+    synAnnotation = '#A78BFA'
+    synType = '#D97706'
   } else if (t === 'light') {
     bg = '#FFF5F7'; surface = '#FFFFFF'; sidebar = '#FFFFFF'; topbar = 'rgba(255,245,247,0.85)'
     text1 = '#2D2528'; text2 = '#555555'; text3 = '#777777'
@@ -68,9 +74,8 @@ watchEffect(() => {
     border = 'rgba(232,93,117,0.1)'; shadow = 'rgba(232,93,117,0.06)'
     cardHover = 'rgba(232,93,117,0.03)'; grid = 'rgba(232,93,117,0.03)'; inputBg = 'rgba(0,0,0,0.02)'
     elevBg = '#FFF7F8'
-    surface2 = '#F8F0F2'
-    synConstant = '#2EAB67'; synKeyword = '#3B82F6'; synDecorator = '#8B5CF6'
-    synType = '#D97706'; synAttr = '#E85D75'; synTag = '#3B82F6'; synPunct = '#8E8E96'
+    synAnnotation = '#7C3AED'
+    synType = '#A35C00'
   }
 
   const r = document.documentElement
@@ -81,6 +86,10 @@ watchEffect(() => {
   r.style.setProperty('--color-text-primary', text1)
   r.style.setProperty('--color-text-secondary', text2)
   r.style.setProperty('--color-text-tertiary', text3)
+  r.style.setProperty('--color-text-1', text1)
+  r.style.setProperty('--color-text-2', text2)
+  r.style.setProperty('--color-text-3', text3)
+  r.style.setProperty('--color-text', text1)
   r.style.setProperty('--color-accent', accent)
   r.style.setProperty('--color-accent-light', accentLight)
   r.style.setProperty('--color-accent-glow', accentGlow)
@@ -92,27 +101,23 @@ watchEffect(() => {
   r.style.setProperty('--text-1', text1)
   r.style.setProperty('--text-2', text2)
   r.style.setProperty('--text-3', text3)
+  r.style.setProperty('--color-syn-annotation', synAnnotation)
+  r.style.setProperty('--color-syn-type', synType)
   r.style.setProperty('--bg-app', bg)
   r.style.setProperty('--bg-card', surface)
   r.style.setProperty('--brand', accent)
   r.style.setProperty('--success', '#2EAB67')
+  r.style.setProperty('--color-success', '#2EAB67')
   r.style.setProperty('--warning', '#E8A817')
   r.style.setProperty('--danger', '#E84C6F')
   r.style.setProperty('--info', '#3B82F6')
+  r.style.setProperty('--color-info', '#3B82F6')
   r.style.setProperty('--border-strong', 'rgba(255,140,158,0.3)')
   r.style.setProperty('--bg-elev', elevBg)
-  r.style.setProperty('--color-surface-2', surface2)
-  r.style.setProperty('--color-syn-constant', synConstant)
-  r.style.setProperty('--color-syn-keyword', synKeyword)
-  r.style.setProperty('--color-syn-decorator', synDecorator)
-  r.style.setProperty('--color-syn-type', synType)
-  r.style.setProperty('--color-syn-attr', synAttr)
-  r.style.setProperty('--color-syn-tag', synTag)
-  r.style.setProperty('--color-syn-punct', synPunct)
   r.setAttribute('data-theme', t)
 })
 
-// ─── Naive UI theme overrides for fonts ───
+// ─── Naive UI theme overrides ───
 const themeOverrides = computed(() => ({
   common: {
     fontFamily: "'JetBrains Mono', 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif",
@@ -122,6 +127,9 @@ const themeOverrides = computed(() => ({
     textColor2: settings.values.theme === 'dark' ? '#A1A1AA' : '#555555',
     textColor3: settings.values.theme === 'dark' ? '#71717A' : '#777777',
     placeholderColor: settings.values.theme === 'dark' ? '#71717A' : '#777777',
+    primaryColor: '#E85D75',
+    primaryColorHover: '#FF8C9E',
+    primaryColorPressed: '#D6506A',
   },
 }))
 
@@ -130,7 +138,9 @@ const naiveTheme = computed(() => settings.values.theme === 'dark' ? darkTheme :
 
 const componentMap: Record<string, any> = {
   HomeView, ToolJson, ToolCurl, ToolClipboard, ToolSettings, ToolShortcuts,
-  ToolConverter, JsonJavabean,
+  ToolCron,
+ ToolConverter,
+  JsonJavabean,
 }
 </script>
 
@@ -142,7 +152,7 @@ const componentMap: Record<string, any> = {
         <div class="app-body">
           <Sidebar />
           <main class="content-area">
-            <KeepAlive>
+            <KeepAlive :include="toolComponentNames">
               <component :is="componentMap[tools.getActiveTab()?.component || 'HomeView']" />
             </KeepAlive>
           </main>
@@ -181,18 +191,13 @@ const componentMap: Record<string, any> = {
   --brand: #E85D75;
   --border: rgba(255,140,158,0.12);
   --border-strong: rgba(255,140,158,0.25);
-  --color-surface-2: #F8F0F2;
-  --color-syn-constant: #2EAB67;
-  --color-syn-keyword: #3B82F6;
-  --color-syn-decorator: #8B5CF6;
-  --color-syn-type: #D97706;
-  --color-syn-attr: #E85D75;
-  --color-syn-tag: #3B82F6;
-  --color-syn-punct: #8E8E96;
   --success: #2EAB67;
+  --color-success: #2EAB67;
   --warning: #E8A817;
   --danger: #E84C6F;
   --info: #3B82F6;
+  --color-info: #3B82F6;
+  --sidebar-w: 220px;
 }
 
 * { margin:0; padding:0; box-sizing:border-box; }
@@ -250,4 +255,18 @@ code, pre, textarea, input[type='text'], input[type='search'], .code-area, .mono
   overflow: hidden;
   background: var(--color-bg);
 }
+
+/* ─── Sidebar resize overlay & dragging state ─── */
+body.is-resizing {
+  user-select: none;
+  -webkit-user-select: none;
+}
+.resize-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 99998;
+  cursor: col-resize;
+  background: transparent;
+}
+
 </style>

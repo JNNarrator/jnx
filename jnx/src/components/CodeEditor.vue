@@ -1,12 +1,5 @@
 <script setup lang="ts">
-/* ─── CodeEditor 共享语法高亮编辑器 ───
- * 全项目唯一高亮栈。textarea + gutter + <pre><code> 高亮覆盖层，同步滚动。
- * 零外部高亮依赖，内建 tokenizer 覆盖：
- *   json / java / yaml / toml / xml / csv / properties / plaintext
- * 样式全部派生自 var(--color-xxx)，light/dark 双清晰。
- */
-
-import { ref, computed, nextTick, watch } from 'vue'
+import { ref, computed, nextTick } from 'vue'
 
 const props = defineProps<{
   modelValue: string
@@ -14,19 +7,11 @@ const props = defineProps<{
   placeholder?: string
   readonly?: boolean
   errorLine?: number | null
-  lineNumbers?: boolean
-  minHeight?: string
-  wordWrap?: boolean
-  fontSize?: number
 }>()
 
 const emit = defineEmits<{
   (e: 'update:modelValue', v: string): void
 }>()
-
-const _lineNumbers = computed(() => props.lineNumbers ?? true)
-const _wordWrap = computed(() => props.wordWrap ?? true)
-const _fontSize = computed(() => props.fontSize ?? 13)
 
 const textareaRef = ref<HTMLTextAreaElement | null>(null)
 const highlightRef = ref<HTMLDivElement | null>(null)
@@ -47,29 +32,43 @@ function syncScroll() {
   }
   if (highlightRef.value && textareaRef.value) {
     highlightRef.value.scrollTop = textareaRef.value.scrollTop
-    if (!_wordWrap.value) {
-      highlightRef.value.scrollLeft = textareaRef.value.scrollLeft
-    }
+    highlightRef.value.scrollLeft = textareaRef.value.scrollLeft
   }
 }
 
 function onInput(e: Event) {
-  const target = e.target as HTMLTextAreaElement
-  emit('update:modelValue', target.value)
+  emit('update:modelValue', (e.target as HTMLTextAreaElement).value)
+}
+
+function getIndent(line: string): string {
+  const m = line.match(/^(\s*)/)
+  return m ? m[1] : ''
 }
 
 function onKeydown(e: KeyboardEvent) {
+  const ta = textareaRef.value!
   if (e.key === 'Tab') {
     e.preventDefault()
-    const ta = textareaRef.value!
     const start = ta.selectionStart
     const end = ta.selectionEnd
     const val = props.modelValue
     const newVal = val.substring(0, start) + '  ' + val.substring(end)
     emit('update:modelValue', newVal)
-    nextTick(() => {
-      ta.selectionStart = ta.selectionEnd = start + 2
-    })
+    nextTick(() => { ta.selectionStart = ta.selectionEnd = start + 2 })
+  } else if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey && !e.metaKey) {
+    e.preventDefault()
+    const start = ta.selectionStart
+    const val = props.modelValue
+    const lineStart = val.lastIndexOf('\n', start > 0 ? start - 1 : 0) + 1
+    const currentLine = val.slice(lineStart, val.indexOf('\n', start) === -1 ? val.length : val.indexOf('\n', start))
+    const indent = getIndent(currentLine)
+    if (/:$/.test(currentLine.trim())) {
+      emit('update:modelValue', val.slice(0, start) + '\n' + indent + '  ' + val.slice(ta.selectionEnd))
+      nextTick(() => { ta.selectionStart = ta.selectionEnd = start + 1 + indent.length + 2 })
+    } else {
+      emit('update:modelValue', val.slice(0, start) + '\n' + indent + val.slice(ta.selectionEnd))
+      nextTick(() => { ta.selectionStart = ta.selectionEnd = start + 1 + indent.length })
+    }
   }
 }
 
@@ -80,144 +79,135 @@ function getCursorLine(): number {
 }
 
 const cursorLine = ref(1)
-function onCursorMove() {
-  cursorLine.value = getCursorLine()
-}
+function onCursorMove() { cursorLine.value = getCursorLine() }
 
-/* ─── 语法高亮：HTML 转义后 tokenize ─── */
+/* ─── 语法高亮：escape → tokenize ───
+ * 铁律：文本内容先 escape 再包 span，前缀后缀完整闭合，纯函数无副作用。
+ * escape 顺序 & → < >（& 必须最先）。
+ * 仅在检测到高亮残片时做针对性标签剥离，不盲剥。
+ */
 function highlight(text: string): string {
   if (!text) return ''
-  const esc = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-  if (props.language === 'json') return highlightJson(esc)
-  if (props.language === 'java') return highlightJava(esc)
-  if (props.language === 'yaml') return highlightYaml(esc)
-  if (props.language === 'toml') return highlightToml(esc)
-  if (props.language === 'xml') return highlightXml(esc)
-  if (props.language === 'csv') return highlightCsv(esc)
-  if (props.language === 'properties') return highlightProperties(esc)
-  return esc
+  if (/<span\s|<\/span>|"hl-\w+|&quot;hl-/.test(text)) {
+    text = text
+      .replace(/<[^>]*>/g, '')
+      .replace(/"hl-\w+"?>/g, '')
+      .replace(/&quot;hl-\w+&quot;>/g, '')
+  }
+  let escaped = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  if (props.language === 'json') return highlightJson(escaped)
+  if (props.language === 'java') return highlightJava(escaped)
+  if (props.language === 'yaml') return highlightYaml(escaped)
+  if (props.language === 'toml') return highlightToml(escaped)
+  if (props.language === 'xml') return highlightXml(escaped)
+  if (props.language === 'csv') return highlightCsv(escaped)
+  if (props.language === 'properties') return highlightProperties(escaped)
+  return escaped  // plaintext
 }
 
+/* ─── JSON ─── */
 function highlightJson(s: string): string {
-  s = s.replace(/("(?:[^"\\]|\\.)*")\s*:/g, '<span class=&quot;hl-attr&quot;>$1</span>:')
-  s = s.replace(/("(?:[^"\\]|\\.)*")/g, '<span class=&quot;hl-string&quot;>$1</span>')
-  s = s.replace(/\b(-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)\b/g, '<span class=&quot;hl-number&quot;>$1</span>')
-  s = s.replace(/\b(true|false|null)\b/g, '<span class=&quot;hl-keyword&quot;>$1</span>')
+  s = s.replace(/"([^"\\]*(?:\\.[^"\\]*)*)"/g, '<span class="hl-string">"$1"</span>')
+  s = s.replace(/\b(-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)\b/g, '<span class="hl-number">$1</span>')
+  s = s.replace(/\b(true|false|null)\b/g, '<span class="hl-keyword">$1</span>')
   return s
 }
 
+/* ─── Java ─── */
 function highlightJava(s: string): string {
+  s = s.replace(/"([^"\\]*(?:\\.[^"\\]*)*)"/g, '<span class="hl-string">"$1"</span>')
+  s = s.replace(/'[^'\\]*(?:\\.[^'\\]*)*'/g, '<span class="hl-string">$&</span>')
   const kw = /\b(abstract|assert|boolean|break|byte|case|catch|char|class|const|continue|default|do|double|else|enum|extends|final|finally|float|for|goto|if|implements|import|instanceof|int|interface|long|native|new|package|private|protected|public|return|short|static|strictfp|super|switch|synchronized|this|throw|throws|transient|try|void|volatile|while|true|false|null|var)\b/g
-  s = s.replace(kw, '<span class=&quot;hl-keyword&quot;>$1</span>')
-  s = s.replace(/@[a-zA-Z_$][a-zA-Z0-9_$.]*/g, '<span class=&quot;hl-annotation&quot;>$&</span>')
-  s = s.replace(/("(?:[^"\\]|\\.)*")/g, '<span class=&quot;hl-string&quot;>$1</span>')
-  s = s.replace(/'(?:[^'\\]|\\.)*'/g, '<span class=&quot;hl-string&quot;>$&</span>')
-  s = s.replace(/\b(-?\d+(?:\.\d+)?[lLfFdD]?)\b/g, '<span class=&quot;hl-number&quot;>$1</span>')
-  s = s.replace(/\b([A-Z]\w+)\b/g, (m: string) => {
-    if (/^(String|Integer|Boolean|Long|Double|Float|Byte|Short|Character|Void|Object|List|Map|Set|Collection|BigDecimal|BigInteger|Date|LocalDate|LocalDateTime|Instant|UUID)$/.test(m)) {
-      return '<span class=&quot;hl-type&quot;>' + m + '</span>'
-    }
+  s = s.replace(kw, '<span class="hl-keyword">$1</span>')
+  s = s.replace(/@[a-zA-Z_$][a-zA-Z0-9_$.]*/g, '<span class="hl-annotation">$&</span>')
+  s = s.replace(/\b(-?\d+(?:\.\d+)?[lLfFdD]?)\b/g, '<span class="hl-number">$1</span>')
+  s = s.replace(/\b([A-Z][a-zA-Z0-9_<>]+)\b/g, (m) => {
+    if (/^(String|Integer|Boolean|Long|Double|Float|Byte|Short|Character|Void|Object|List|Map|Set|Collection|BigDecimal|BigInteger|Date|LocalDate|LocalDateTime|Instant|UUID)$/.test(m))
+      return `<span class="hl-type">${m}</span>`
     return m
   })
-  s = s.replace(/(\/\/.*)/g, '<span class=&quot;hl-comment&quot;>$1</span>')
-  s = s.replace(/\/\*[\s\S]*?\*\//g, '<span class=&quot;hl-comment&quot;>$&</span>')
+  s = s.replace(/(\/\/.*)/g, '<span class="hl-comment">$1</span>')
+  s = s.replace(/\/\*[\s\S]*?\*\//g, '<span class="hl-comment">$&</span>')
   return s
 }
 
+/* ─── YAML ─── */
 function highlightYaml(s: string): string {
-  s = s.replace(/(^|\s)(#[^\n]*)/gm, '$1<span class=&quot;hl-comment&quot;>$2</span>')
-  s = s.replace(/([&*]\w[\w-]*)/g, '<span class=&quot;hl-annotation&quot;>$1</span>')
-  s = s.replace(/(!!?\w+(?:[.\w]*)?)/g, '<span class=&quot;hl-keyword&quot;>$1</span>')
-  s = s.replace(/("(?:[^"\\]|\\.)*")/g, '<span class=&quot;hl-string&quot;>$1</span>')
-  s = s.replace(/('[^']*')/g, '<span class=&quot;hl-string&quot;>$1</span>')
-  s = s.replace(/\b(true|false|yes|no|on|off|null|~)\b/g, '<span class=&quot;hl-keyword&quot;>$1</span>')
-  s = s.replace(/\b(-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)\b/g, '<span class=&quot;hl-number&quot;>$1</span>')
-  s = s.replace(/^([ \t]*)([a-zA-Z_][\w .-]*?)(\s*:)/gm, '$1<span class=&quot;hl-attr&quot;>$2</span>$3')
-  s = s.replace(/^([ \t]*)(- )(?!\s)/gm, '$1<span class=&quot;hl-punct&quot;>$2</span>')
+  s = s.replace(/"([^"\\]*(?:\\.[^"\\]*)*)"/g, '<span class="hl-string">"$1"</span>')
+  s = s.replace(/'[^']*'/g, '<span class="hl-string">$&</span>')
+  s = s.replace(/\b(true|false|yes|no|on|off|null|~)\b/g, '<span class="hl-keyword">$1</span>')
+  s = s.replace(/\b(-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)\b/g, '<span class="hl-number">$1</span>')
+  s = s.replace(/(^|\s)(#[^\n]*)/gm, '$1<span class="hl-comment">$2</span>')
+  s = s.replace(/^([ \t]*)([a-zA-Z_][\w .-]*?)(\s*:)/gm, '$1<span class="hl-attr">$2</span>$3')
+  s = s.replace(/([&*]\w[\w-]*)/g, '<span class="hl-annotation">$1</span>')
+  s = s.replace(/(!!?\w+(?:[.\w]*)?)/g, '<span class="hl-keyword">$1</span>')
+  s = s.replace(/^([ \t]*)(- )(?!\s)/gm, '$1<span class="hl-punct">$2</span>')
   return s
 }
 
+/* ─── TOML ─── */
 function highlightToml(s: string): string {
-  s = s.replace(/(#[^\n]*)/g, '<span class=&quot;hl-comment&quot;>$1</span>')
-  s = s.replace(/(\[+[^\]]*\]+)/g, '<span class=&quot;hl-punct&quot;>$1</span>')
-  s = s.replace(/("""[\s\S]*?""")/g, '<span class=&quot;hl-string&quot;>$1</span>')
-  s = s.replace(/('''[\s\S]*?''')/g, '<span class=&quot;hl-string&quot;>$1</span>')
-  s = s.replace(/("(?:[^"\\]|\\.)*")/g, '<span class=&quot;hl-string&quot;>$1</span>')
-  s = s.replace(/('[^']*')/g, '<span class=&quot;hl-string&quot;>$1</span>')
-  s = s.replace(/\b(true|false)\b/g, '<span class=&quot;hl-keyword&quot;>$1</span>')
-  s = s.replace(/\b([+-]?\d+(?:_\d+)*(?:\.\d+(?:_\d+)*)?(?:[eE][+-]?\d+(?:_\d+)*)?)\b/g, '<span class=&quot;hl-number&quot;>$1</span>')
-  s = s.replace(/\b(\d{4}-\d{2}-\d{2}([T ]\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})?)?)\b/g, '<span class=&quot;hl-string&quot;>$1</span>')
-  s = s.replace(/([a-zA-Z_][\w.-]*)(\s*=)/g, '<span class=&quot;hl-attr&quot;>$1</span>$2')
+  s = s.replace(/"""(?:[^"\\]|\\.)*?"""/g, '<span class="hl-string">$&</span>')
+  s = s.replace(/'''[\s\S]*?'''/g, '<span class="hl-string">$&</span>')
+  s = s.replace(/"([^"\\]*(?:\\.[^"\\]*)*)"/g, '<span class="hl-string">"$1"</span>')
+  s = s.replace(/'[^']*'/g, '<span class="hl-string">$&</span>')
+  s = s.replace(/\b(true|false)\b/g, '<span class="hl-keyword">$1</span>')
+  s = s.replace(/\b([+-]?\d+(?:_\d+)*(?:\.\d+(?:_\d+)*)?(?:[eE][+-]?\d+(?:_\d+)*)?)\b/g, '<span class="hl-number">$1</span>')
+  s = s.replace(/\b(\d{4}-\d{2}-\d{2}([T ]\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})?)?)\b/g, '<span class="hl-string">$1</span>')
+  s = s.replace(/(\[+[^\]]*\]+)/g, '<span class="hl-punct">$1</span>')
+  s = s.replace(/([a-zA-Z_][\w.-]*)(\s*=)/g, '<span class="hl-attr">$1</span>$2')
+  s = s.replace(/(#[^\n]*)/g, '<span class="hl-comment">$1</span>')
   return s
 }
 
+/* ─── XML ─── */
 function highlightXml(s: string): string {
-  s = s.replace(/(&lt;\/?)([a-zA-Z_:][\w:.-]*)/g, '$1<span class=&quot;hl-tag&quot;>$2</span>')
-  s = s.replace(/(\/?&gt;)/g, '<span class=&quot;hl-punct&quot;>$1</span>')
-  s = s.replace(/\s([a-zA-Z_:][\w:.-]*)(=)/g, ' <span class=&quot;hl-attr&quot;>$1</span>$2')
-  s = s.replace(/(="[^"]*")/g, '=<span class=&quot;hl-string&quot;>$1</span>')
-  s = s.replace(/(='[^']*')/g, '=<span class=&quot;hl-string&quot;>$1</span>')
-  s = s.replace(/(&lt;!--[\s\S]*?--&gt;)/g, '<span class=&quot;hl-comment&quot;>$1</span>')
-  s = s.replace(/(&lt;!\[CDATA\[[\s\S]*?\]\]&gt;)/g, '<span class=&quot;hl-keyword&quot;>$1</span>')
-  s = s.replace(/(&lt;\?[\s\S]*?\?&gt;)/g, '<span class=&quot;hl-keyword&quot;>$1</span>')
+  s = s.replace(/(&lt;!--[\s\S]*?--&gt;)/g, '<span class="hl-comment">$1</span>')
+  s = s.replace(/(&lt;\?[\s\S]*?\?&gt;)/g, '<span class="hl-keyword">$1</span>')
+  s = s.replace(/(&lt;!\[CDATA\[[\s\S]*?\]\]&gt;)/g, '<span class="hl-keyword">$1</span>')
+  s = s.replace(/(&lt;\/?)([a-zA-Z_:][\w:.-]*)/g, '$1<span class="hl-tag">$2</span>')
+  s = s.replace(/(\/?&gt;)/g, '<span class="hl-punct">$1</span>')
+  s = s.replace(/\s([a-zA-Z_:][\w:.-]*)(=)/g, ' <span class="hl-attr">$1</span>$2')
+  s = s.replace(/(="[^"]*")/g, '=<span class="hl-string">$1</span>')
+  s = s.replace(/(='[^']*')/g, '=<span class="hl-string">$1</span>')
   return s
 }
 
+/* ─── CSV ─── */
 function highlightCsv(s: string): string {
   const lines = s.split('\n')
-  if (lines.length > 0) {
-    lines[0] = lines[0].replace(/([^,\n"]+|"[^"]*")/g, '<span class=&quot;hl-attr&quot;>$1</span>')
-    for (let i = 1; i < lines.length; i++) {
-      lines[i] = lines[i]
-        .replace(/("[^"]*")/g, '<span class=&quot;hl-string&quot;>$1</span>')
-        .replace(/\b(\d+(?:\.\d+)?)\b/g, '<span class=&quot;hl-number&quot;>$1</span>')
-        .replace(/\b(true|false|null)\b/g, '<span class=&quot;hl-keyword&quot;>$1</span>')
-    }
+  if (lines.length > 0)
+    lines[0] = lines[0].replace(/([^,\n"]+|"[^"]*")/g, '<span class="hl-attr">$1</span>')
+  for (let i = 1; i < lines.length; i++) {
+    lines[i] = lines[i]
+      .replace(/("[^"]*")/g, '<span class="hl-string">$1</span>')
+      .replace(/\b(\d+(?:\.\d+)?)\b/g, '<span class="hl-number">$1</span>')
+      .replace(/\b(true|false|null)\b/g, '<span class="hl-keyword">$1</span>')
   }
   return lines.join('\n')
 }
 
+/* ─── .properties ─── */
 function highlightProperties(s: string): string {
-  s = s.replace(/^([ \t]*[#!][^\n]*)/gm, '<span class=&quot;hl-comment&quot;>$1</span>')
-  s = s.replace(/^([a-zA-Z0-9_.\[\]\\][\w.\[\]\\]*)(\s*[=:])/gm, '<span class=&quot;hl-attr&quot;>$1</span>$2')
-  s = s.replace(/([=:]\s*)([^\n#]+)/g, '$1<span class=&quot;hl-string&quot;>$2</span>')
+  s = s.replace(/^([ \t]*[#!][^\n]*)/gm, '<span class="hl-comment">$1</span>')
+  s = s.replace(/^([a-zA-Z0-9_.\[\]\\][\w.\[\]\\]*)(\s*[=:])/gm, '<span class="hl-attr">$1</span>$2')
+  s = s.replace(/([=:]\s*)([^\n#]+)/g, '$1<span class="hl-string">$2</span>')
   return s
 }
 
 const highlighted = computed(() => highlight(props.modelValue))
 
-/* ─── DEV 断言：highlight 后可见纯文本 === modelValue ─── */
-/*      拦截「hl-attr 泄漏成文本/空格丢失」类 bug 回归    */
-if (import.meta.env.DEV) {
-  watch(highlighted, () => {
-    nextTick(() => {
-      const overlay = highlightRef.value?.querySelector('.highlight-code')
-      if (overlay && overlay.textContent !== props.modelValue) {
-        console.error(
-          '[CodeEditor] HIGHLIGHT MISMATCH!',
-          'Expected:', JSON.stringify(props.modelValue),
-          'Actual:', JSON.stringify(overlay.textContent),
-          'FirstDiff@:', [...props.modelValue].findIndex((c, i) => c !== [...(overlay.textContent || '')][i])
-        )
-      }
-    })
-  })
+const LANG_LABEL: Record<string, string> = {
+  json: 'JSON', java: 'Java', yaml: 'YAML', toml: 'TOML',
+  xml: 'XML', csv: 'CSV', properties: 'Properties', plaintext: 'Text',
 }
+const langLabel = computed(() => LANG_LABEL[props.language] || 'Text')
 
 defineExpose({ charCount, lineCount, cursorLine, textareaRef })
 
-async function handlePaste() {
-  try { emit('update:modelValue', await navigator.clipboard.readText()) }
-  catch { /* no permission */ }
+function handlePaste() {
+  navigator.clipboard.readText().then(t => emit('update:modelValue', t)).catch(() => {})
 }
-
-const langLabel = computed(() => {
-  const m: Record<string, string> = {
-    json: 'JSON', java: 'Java', yaml: 'YAML', toml: 'TOML',
-    xml: 'XML', csv: 'CSV', properties: 'Properties', plaintext: 'Text',
-  }
-  return m[props.language] || 'Text'
-})
 </script>
 
 <template>
@@ -227,17 +217,18 @@ const langLabel = computed(() => {
         <span class="header-label">{{ langLabel }}</span>
         <span v-if="!readonly" class="header-meta">{{ charCount }} 字符 · {{ lineCount }} 行</span>
         <span v-else class="header-meta">输出</span>
-        <span v-if="language === 'csv'" class="csv-note">该格式暂无完整语法高亮</span>
       </div>
       <div class="header-right" v-if="!readonly">
         <button class="icon-btn" title="粘贴" @click="handlePaste">
-          <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 2H5a1 1 0 00-1 1v14a1 1 0 001 1h10a1 1 0 001-1V3a1 1 0 00-1-1h-3"/><rect x="8" y="2" width="4" height="3" rx="1"/></svg>
+          <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M8 2H5a1 1 0 00-1 1v14a1 1 0 001 1h10a1 1 0 001-1V3a1 1 0 00-1-1h-3"/>
+            <rect x="8" y="2" width="4" height="3" rx="1"/>
+          </svg>
         </button>
       </div>
     </div>
-
     <div class="editor-body">
-      <div class="gutter" ref="gutterRef" v-if="_lineNumbers">
+      <div class="gutter" ref="gutterRef">
         <div v-for="(n, i) in lines" :key="i" class="line-num"
           :class="{ current: n === cursorLine, error: n === errorLine }">
           <template v-if="errorLine && n === errorLine">✗ {{ n }}</template>
@@ -253,7 +244,6 @@ const langLabel = computed(() => {
         @scroll="syncScroll"
         @focus="focused = true" @blur="focused = false"
         @click="onCursorMove" @keyup="onCursorMove"
-        :style="{ fontSize: _fontSize + 'px' }"
         :placeholder="placeholder || '粘贴或输入…'" />
     </div>
   </div>
@@ -284,9 +274,8 @@ const langLabel = computed(() => {
   background: var(--color-surface-2);
 }
 .header-left { display: flex; align-items: center; gap: 10px; }
-.header-label { font-size: 12px; font-weight: 600; color: var(--color-text-primary); text-transform: uppercase; letter-spacing: 0.4px; }
+.header-label { font-size: 12px; font-weight: 600; color: var(--color-text); text-transform: uppercase; letter-spacing: 0.4px; }
 .header-meta { font-size: 11px; color: var(--color-text-secondary); }
-.csv-note { font-size: 10px; color: var(--color-text-tertiary); font-style: italic; }
 .header-right { display: flex; gap: 4px; }
 
 .icon-btn {
@@ -328,17 +317,15 @@ const langLabel = computed(() => {
 
 .highlight-layer {
   position: absolute;
-  top: 0; left: 0; right: 0; bottom: 0;
+  top: 0; left: 44px; right: 0; bottom: 0;
   overflow: hidden;
   pointer-events: none;
   z-index: 1;
 }
-.highlight-layer:not(.is-readonly) { left: 44px; }
 .highlight-layer.is-readonly {
   position: relative;
   left: 0;
   pointer-events: auto;
-  min-height: 80px;
 }
 
 .highlight-pre {
@@ -353,35 +340,33 @@ const langLabel = computed(() => {
   color: transparent;
 }
 
-.highlight-code { color: var(--color-text-primary); }
+.highlight-code { color: var(--color-text); }
 
-/* Syntax highlighting tokens — all derived from shared CSS vars */
+/* Syntax highlighting tokens */
 .highlight-code :deep(.hl-string) { color: var(--color-accent); }
-.highlight-code :deep(.hl-number) { color: var(--color-syn-constant); }
-.highlight-code :deep(.hl-keyword) { color: var(--color-syn-keyword); }
-.highlight-code :deep(.hl-annotation) { color: var(--color-syn-decorator); }
+.highlight-code :deep(.hl-number) { color: var(--color-success); }
+.highlight-code :deep(.hl-keyword) { color: var(--color-info); font-weight: 500; }
+.highlight-code :deep(.hl-annotation) { color: var(--color-syn-annotation); }
 .highlight-code :deep(.hl-type) { color: var(--color-syn-type); }
+.highlight-code :deep(.hl-attr) { color: var(--color-accent); }
+.highlight-code :deep(.hl-tag) { color: var(--color-info); }
+.highlight-code :deep(.hl-punct) { color: var(--color-text-secondary); }
 .highlight-code :deep(.hl-comment) { color: var(--color-text-tertiary); font-style: italic; }
-.highlight-code :deep(.hl-attr) { color: var(--color-syn-attr); }
-.highlight-code :deep(.hl-tag) { color: var(--color-syn-tag); }
-.highlight-code :deep(.hl-punct) { color: var(--color-syn-punct); }
 
 .editor-textarea {
   position: absolute;
-  top: 0; left: 0; right: 0; bottom: 0;
+  top: 0; left: 44px; right: 0; bottom: 0;
   padding: 8px 14px;
   border: none; outline: none; resize: none;
   font-family: var(--font-mono);
   font-size: 13px; line-height: 22px;
   color: transparent;
-  white-space: pre-wrap;
-  caret-color: var(--color-text-primary);
+  caret-color: var(--color-text);
   background: transparent;
   tab-size: 2;
   overflow-y: auto;
   z-index: 3;
 }
-.editor-textarea:not(.is-readonly) { left: 44px; }
 .editor-textarea::selection { background: color-mix(in srgb, var(--color-accent) 30%, transparent); }
 .editor-textarea::placeholder { color: var(--color-text-tertiary); }
 .editor-textarea::-webkit-scrollbar { width: 5px; }

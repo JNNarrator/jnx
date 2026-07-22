@@ -1,7 +1,10 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted } from 'vue'
+import { defineOptions, onMounted, onUnmounted } from 'vue'
 import { NButton, NSpace, NEmpty, NSpin, useMessage } from 'naive-ui'
 import { useClipboardStore } from '../stores/clipboard'
+
+defineOptions({ name: 'ToolClipboard' })
+// 工具记忆（useToolDraft）：跳过 — 剪贴板历史已通过 clipboard_history 表持久化，不重复记忆
 
 const clip = useClipboardStore()
 const msg = useMessage()
@@ -34,22 +37,20 @@ function getPreview(text: string): string {
       </NSpace>
     </div>
 
-    <div class="spin-wrap">
-      <NSpin :show="clip.loading" style="height:100%;">
-        <div v-if="clip.items.length === 0 && !clip.loading" class="empty-state">
-          <NEmpty description="暂无剪贴板记录。复制一些内容即可自动记录。" />
-        </div>
-        <div v-else class="history-list">
-          <div v-for="item in clip.items" :key="item.id" class="history-item" @click="copy(item.content)">
-            <div class="item-content">{{ getPreview(item.content) }}</div>
-            <div class="item-meta">
-              <span class="item-time">{{ formatTime(item.created_at) }}</span>
-              <span class="item-source">{{ item.source || '手动' }}</span>
-            </div>
+    <NSpin :show="clip.loading">
+      <div v-if="clip.items.length === 0 && !clip.loading" class="empty-state">
+        <NEmpty description="暂无剪贴板记录。复制一些内容即可自动记录。" />
+      </div>
+      <div v-else class="history-list">
+        <div v-for="item in clip.items" :key="item.id" class="history-item" @click="copy(item.content)">
+          <div class="item-content">{{ getPreview(item.content) }}</div>
+          <div class="item-meta">
+            <span class="item-time">{{ formatTime(item.created_at) }}</span>
+            <span class="item-source">{{ item.source || '手动' }}</span>
           </div>
         </div>
-      </NSpin>
-    </div>
+      </div>
+    </NSpin>
   </div>
 </template>
 
@@ -90,29 +91,7 @@ function getPreview(text: string): string {
   padding: 60px 0;
 }
 
-.spin-wrap {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-}
-
-.spin-wrap :deep(.n-spin-container) {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-}
-
-.spin-wrap :deep(.n-spin-content) {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-}
-
 .history-list {
-  min-height: 0;
   display: flex;
   flex-direction: column;
   gap: 4px;

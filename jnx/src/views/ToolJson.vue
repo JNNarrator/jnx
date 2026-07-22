@@ -1,16 +1,43 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { defineOptions, ref, watch, computed } from 'vue'
 import { useMessage } from 'naive-ui'
 import { useKeyboardShortcut } from '../composables/useKeyboardShortcut'
+import { useToolDraft } from '../composables/useToolDraft'
 import CodeEditor from '../components/CodeEditor.vue'
 import JsonTree from '../components/JsonTree.vue'
 import DraggableSplitter from '../components/DraggableSplitter.vue'
 import type { FlatJsonNode } from '../types'
 
+defineOptions({ name: 'ToolJson' })
+
+interface ToolJsonDraft {
+  input: string
+  searchQuery: string
+}
+
+const { state: draft, resetDraft } = useToolDraft<ToolJsonDraft>('json', {
+  input: '',
+  searchQuery: '',
+}, {
+  validate: (raw): raw is ToolJsonDraft => {
+    return typeof raw === 'object' && raw !== null
+      && typeof (raw as any).input === 'string'
+      && typeof (raw as any).searchQuery === 'string'
+  },
+})
+
+// 为了让模板继续用 input/searchQuery 名，创建 computed 代理
+const input = computed({
+  get: () => draft.value.input,
+  set: (v: string) => { draft.value = { ...draft.value, input: v } },
+})
+const searchQuery = computed({
+  get: () => draft.value.searchQuery,
+  set: (v: string) => { draft.value = { ...draft.value, searchQuery: v } },
+})
+
 const msg = useMessage()
-const input = ref('')
 const treeNodes = ref<FlatJsonNode[]>([])
-const searchQuery = ref('')
 const splitRatio = ref(0.5)
 const isValid = ref<'valid' | 'invalid' | null>(null)
 const errorMsg = ref('')
@@ -114,6 +141,7 @@ function copyAll() {
 function clearAll() {
   input.value = ''; treeNodes.value = []; isValid.value = null; errorMsg.value = ''
   errorLineRef.value = null; searchQuery.value = ''
+  resetDraft()
 }
 
 useKeyboardShortcut('json.run', () => execute(), { skipWhenEditing: false })
@@ -153,7 +181,7 @@ watch(searchQuery, (val) => {
         <button class="icon-btn" title="复制" @click="copyAll">
           <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="6" y="4" width="11" height="13" rx="1.5"/><path d="M3 16V3a1 1 0 011-1h10"/></svg>
         </button>
-        <button class="icon-btn" title="清空" @click="clearAll">
+        <button class="icon-btn" title="清空（同时清除记忆）" @click="clearAll">
           <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 5h12M7 5V3.5A.5.5 0 017.5 3h5a.5.5 0 01.5.5V5M8 8v6M12 8v6M3 5h14l-1.5 12a2 2 0 01-2 2h-7a2 2 0 01-2-2L3 5z"/></svg>
         </button>
         <div class="divider-v"></div>

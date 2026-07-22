@@ -19,6 +19,7 @@ export const SHORTCUTS = {
   'nav.toSettings':        { mac: { mods: ['mod','shift'], key: 's' },   win: { mods: ['mod','shift'], key: 's' } },
   'nav.toShortcuts':       { mac: { mods: ['mod','shift'], key: '/' },   win: { mods: ['mod','shift'], key: '/' } },
   'nav.toConverter':       { mac: { mods: ['mod','shift'], key: 'e' },   win: { mods: ['mod','shift'], key: 'e' } },
+  'nav.toCron':            { mac: { mods: ['mod','shift'], key: 'x' },   win: { mods: ['mod','shift'], key: 'x' } },
   'nav.toggleSidebar':     { mac: { mods: ['mod'], key: '\\' },          win: { mods: ['mod'], key: '\\' } },
 
   /* 主题：避开 ⌘D（加书签/分屏），用 ⌘Shift+T 或 ⌘Option+T */
@@ -54,6 +55,7 @@ export const SHORTCUT_GROUPS = [
       { action: 'nav.toSettings',  label: '设置页' },
       { action: 'nav.toShortcuts', label: '快捷键页' },
       { action: 'theme.cycle',     label: '切换主题' },
+      { action: 'nav.toCron',      label: 'Cron 表达式' },
       { action: 'nav.toConverter', label: '格式互转页' },
     ],
   },
@@ -73,6 +75,7 @@ export const HOME_CHEATSHEET: { action: ShortcutAction; desc: string }[] = [
   { action: 'nav.toJson',    desc: 'JSON 工具' },
   { action: 'nav.toHttp',    desc: 'HTTP 请求' },
   { action: 'theme.cycle',   desc: '切换主题' },
+  { action: 'nav.toCron',    desc: 'Cron 表达式' },
   { action: 'nav.toHome',    desc: '返回首页' },
   { action: 'nav.toConverter', desc: '格式互转' },
 ]

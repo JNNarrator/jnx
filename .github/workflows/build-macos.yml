@@ -3,7 +3,6 @@ name: Build (macOS)
 on:
   push:
     branches: [master, main]
-    tags: [v*]
   pull_request:
     branches: [master, main]
   workflow_dispatch:
@@ -33,7 +32,7 @@ jobs:
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: aarch64-apple-darwin, x86_64-apple-darwin
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
 
       - name: Cache Cargo
         uses: actions/cache@v4
@@ -48,25 +47,37 @@ jobs:
       - name: Install npm deps
         run: npm ci
 
-      # Build universal binary (ARM + Intel) in a single run
-      - name: Build Tauri app (macOS universal)
+      - name: Build Tauri app (macOS)
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           projectPath: jnx
-          tagName: v0.1.${{ github.run_number }}
-          releaseName: 'JNX v0.1.${{ github.run_number }}'
-          releaseBody: 'JNX v0.1.${{ github.run_number }} - see assets to download.'
+          tagName: ${{ github.ref_name }}
+          releaseName: 'jnx ${{ github.ref_name }}'
+          releaseBody: 'See the assets to download this version and install.'
           releaseDraft: true
           prerelease: false
-          args: --target universal-apple-darwin
+          args: --target aarch64-apple-darwin
+
+      - name: Build Tauri app (macOS x86_64)
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          projectPath: jnx
+          tagName: ${{ github.ref_name }}
+          releaseName: 'jnx ${{ github.ref_name }}'
+          releaseBody: 'See the assets to download this version and install.'
+          releaseDraft: true
+          prerelease: false
+          args: --target x86_64-apple-darwin
 
       - name: Upload macOS artifacts
         uses: actions/upload-artifact@v4
         with:
           name: jnx-macos
           path: |
-            jnx/src-tauri/target/universal-apple-darwin/release/bundle/**/*.dmg
-            jnx/src-tauri/target/universal-apple-darwin/release/bundle/**/*.app
+            jnx/src-tauri/target/*/release/bundle/**/*.dmg
+            jnx/src-tauri/target/*/release/bundle/**/*.app
           if-no-files-found: warn
