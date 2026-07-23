@@ -27,6 +27,10 @@ export function safeJavaIdentifier(s: string): string {
 }
 
 export function toPascalCase(s: string): string {
+  // 若已是 camelCase（小写+大写相邻），保留内部 case，只大写首字母
+  if (/[a-z][A-Z]/.test(s)) {
+    return s.charAt(0).toUpperCase() + s.slice(1)
+  }
   return s.split(/[^a-zA-Z0-9]/)
     .filter(Boolean)
     .map(p => p.charAt(0).toUpperCase() + p.slice(1).toLowerCase())

@@ -51,10 +51,11 @@ jnx/
 │   │   ├── TopBar.vue          # 顶栏（搜索框接 openPalette、主题切换、版本号）
 │   │   ├── Sidebar.vue         # 侧边栏导航（可折叠/拖拽调宽/CSS 变量 --sidebar-w）
 │   │   ├── CommandPalette.vue  # 命令面板（Teleport 到 body，Esc/遮罩关闭，键盘可导航）
-│   │   ├── CodeEditor.vue      # 通用代码编辑器（8 种语言语法高亮 + 行号 + Tab/Enter 自动缩进）
+│   │   ├── CodeEditor.vue      # 通用代码编辑器（9 种语言语法高亮 + 行号 + Tab/Enter 自动缩进）
 │   │   ├── JsonTree.vue        # JSON 树形浏览器 + 搜索
 │   │   ├── HeaderEditor.vue    # HTTP 请求头编辑器
 │   │   ├── DraggableSplitter.vue # 可拖拽分隔条
+│   │   ├── FieldTable.vue      # DDL⇄Java 可编辑字段表格（NDataTable + 表属性 + 索引编辑）
 │   │   └── Kbd.vue             # 快捷键展示组件（读运行时真实绑定）
 │   ├── views/                  # 页面视图
 │   │   ├── HomeView.vue        # 首页（分层布局：搜索 / 最近使用 / 分类网格 / 快捷键速查）
@@ -65,7 +66,8 @@ jnx/
 │   │   ├── ToolCron.vue        # Cron 表达式可视化
 │   │   ├── ToolSettings.vue    # 设置页（主题/标签栏/剪贴板）
 │   │   ├── ToolShortcuts.vue   # 快捷键自定义页（录制/冲突检测/恢复默认）
-│   │   └── JsonJavabean.vue    # JSON ⇄ JavaBean 互转
+│   │   ├── JsonJavabean.vue    # JSON ⇄ JavaBean 互转
+│   │   └── ToolDdlJava.vue     # DDL ⇄ Java 实体类双向转换（MySQL/PG/OB）
 │   ├── stores/                 # Pinia 状态管理
 │   │   ├── tools.ts            # 工具标签管理（打开/关闭/激活）
 │   │   ├── settings.ts         # 应用设置（从 SQLite 读写）
@@ -89,7 +91,15 @@ jnx/
 │   │   ├── db.ts               # SQLite 数据库操作（设置/剪贴板 CRUD）
 │   │   ├── parseCurl.ts        # cURL 命令解析器
 │   │   ├── converter.ts        # 格式互转引擎（JSON/YAML/TOML/XML/CSV/Properties）
-│   │   └── cron.ts             # Cron 表达式解析/构建/描述
+│   │   ├── cron.ts             # Cron 表达式解析/构建/描述
+│   │   ├── ddlTypes.ts         # DDL⇄Java IR 类型定义
+│   │   ├── ddlOptions.ts       # DDL⇄Java 选项配置（20+ knob）
+│   │   ├── ddlTokenizer.ts     # 引号感知 SQL tokenizer
+│   │   ├── ddlTypeMap.ts       # MySQL/PG/OB ↔ Java 类型映射
+│   │   ├── ddlParser.ts        # DDL → IR 解析
+│   │   ├── javaEntityParser.ts # Java → IR 解析
+│   │   ├── ddlToJava.ts        # IR → Java 代码生成
+│   │   └── ddlRenderer.ts      # IR → DDL 渲染（3 方言）
 │   ├── assets/                 # 静态资源
 │   │   ├── fonts/              # JetBrains Mono woff2 字体文件（SIL Open Font License 1.1，自托管）
 │   │   └── styles/
@@ -206,6 +216,7 @@ jnx/
 | XML | `highlightXml` | 标签名（keyword）、属性名（attr）、`< > </` 定界符（punct）、字符串值 |
 | CSV | `highlightCsv` | 首行表头（keyword） |
 | Properties | `highlightProperties` | `key=` 前（attr）、注释、行内值（string） |
+| SQL | `highlightSql` | 关键字（info）、字符串（accent）、数字（success）、`--`/`/* */` 注释（tertiary italic） |
 | Plaintext | `highlightPlaintext` | 无高亮（纯文本） |
 
 ### 铁律（所有 tokenizer 遵守）
@@ -223,11 +234,14 @@ jnx/
 - 行号显示，当前行高亮
 - 错误行标记（`:error-line` prop）
 
-### 替换注意事项
+### 高亮与 model 分离
 
-- **ToolConverter**：原 NInput 的 `onEditorKeydown` 自动缩进逻辑已删除，全部由 CodeEditor 接管
-- **ToolCurl**：body textarea 和 modal textarea 均已替换；modal 内使用 `height:180px` 固定高度容器
-- **ToolJson**：原 JsonEditor 路径已废弃，全部使用 `CodeEditor(language="json")`
+- model 始终保持纯文本（单一真相）
+- `onInput` emit 前检测并 stripHtml，防止标签污染
+- 所有写入入口（setter/示例/交换/清空/载入）一律 stripHtml
+- 高亮层仅用于 `v-html` 展示，不回写 model
+
+### 替换注意事项
 
 ---
 

@@ -54,11 +54,11 @@ const { state: draft, resetDraft } = useToolDraft<JsonJavabeanDraft>('json-javab
 
 /* ─── 双向绑定 ─── */
 const jsonText = computed({
-  get: () => draft.value.jsonText,
+  get: () => stripHtml(draft.value.jsonText),
   set: (v: string) => { draft.value = { ...draft.value, jsonText: stripHtml(v) } },
 })
 const javaText = computed({
-  get: () => draft.value.javaText,
+  get: () => stripHtml(draft.value.javaText),
   set: (v: string) => { draft.value = { ...draft.value, javaText: stripHtml(v) } },
 })
 const direction = computed({

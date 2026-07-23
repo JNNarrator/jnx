@@ -20,8 +20,13 @@ const GLYPH: Record<string, { mac: string; win: string }> = {
   opt:   { mac: '⌥', win: 'Ctrl' },
 }
 
+function translateKey(k: string): string {
+  if (k in GLYPH) return GLYPH[k][isMac.value ? 'mac' : 'win']
+  return formatKey(k)
+}
+
 const parts = computed(() => {
-  if (props.keys) return props.keys
+  if (props.keys) return props.keys.map(k => translateKey(k))
   if (props.action) {
     let chord: Chord = SHORTCUTS[props.action][isMac.value ? 'mac' : 'win']
     try { chord = bindings.chordFor(props.action) } catch {}

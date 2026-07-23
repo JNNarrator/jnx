@@ -13,6 +13,7 @@ import ToolSettings from './views/ToolSettings.vue'
 import ToolShortcuts from './views/ToolShortcuts.vue'
  import ToolCron from './views/ToolCron.vue'
 import JsonJavabean from './views/JsonJavabean.vue'
+import ToolDdlJava from './views/ToolDdlJava.vue'
 import { useToolsStore } from './stores/tools'
 import { useSettingsStore } from './stores/settings'
 import { useShortcutBindingsStore } from './stores/shortcutBindings'
@@ -141,6 +142,7 @@ const componentMap: Record<string, any> = {
   ToolCron,
  ToolConverter,
   JsonJavabean,
+  ToolDdlJava,
 }
 </script>
 

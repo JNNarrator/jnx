@@ -3,7 +3,7 @@ import { ref, computed, nextTick } from 'vue'
 
 const props = defineProps<{
   modelValue: string
-  language: 'json' | 'java' | 'yaml' | 'toml' | 'xml' | 'csv' | 'properties' | 'plaintext'
+  language: 'json' | 'java' | 'yaml' | 'toml' | 'xml' | 'csv' | 'properties' | 'sql' | 'plaintext'
   placeholder?: string
   readonly?: boolean
   errorLine?: number | null
@@ -37,7 +37,8 @@ function syncScroll() {
 }
 
 function onInput(e: Event) {
-  emit('update:modelValue', (e.target as HTMLTextAreaElement).value)
+  const raw = (e.target as HTMLTextAreaElement).value
+  emit('update:modelValue', /<[^>]*>/.test(raw) || /"hl-\w+/.test(raw) ? stripHtml(raw) : raw)
 }
 
 function getIndent(line: string): string {
@@ -86,13 +87,18 @@ function onCursorMove() { cursorLine.value = getCursorLine() }
  * escape 顺序 & → < >（& 必须最先）。
  * 仅在检测到高亮残片时做针对性标签剥离，不盲剥。
  */
+function stripHtml(s: string): string {
+  let t = s.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&').replace(/&quot;/g, '"')
+  t = t.replace(/<[^>]*>/g, '')
+  t = t.replace(/(?:class|style)\s*=\s*"[^"]*"\s*/g, '')
+  t = t.replace(/"hl-\w+"?>?/g, '')
+  return t
+}
+
 function highlight(text: string): string {
   if (!text) return ''
-  if (/<span\s|<\/span>|"hl-\w+|&quot;hl-/.test(text)) {
-    text = text
-      .replace(/<[^>]*>/g, '')
-      .replace(/"hl-\w+"?>/g, '')
-      .replace(/&quot;hl-\w+&quot;>/g, '')
+  if (/<span\s|<\/span>|"hl-\w+|&quot;hl-|&lt;span/i.test(text)) {
+    text = stripHtml(text)
   }
   let escaped = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
   if (props.language === 'json') return highlightJson(escaped)
@@ -101,6 +107,7 @@ function highlight(text: string): string {
   if (props.language === 'toml') return highlightToml(escaped)
   if (props.language === 'xml') return highlightXml(escaped)
   if (props.language === 'csv') return highlightCsv(escaped)
+  if (props.language === 'sql') return highlightSql(escaped)
   if (props.language === 'properties') return highlightProperties(escaped)
   return escaped  // plaintext
 }
@@ -195,11 +202,23 @@ function highlightProperties(s: string): string {
   return s
 }
 
+/* ─── SQL ─── */
+function highlightSql(s: string): string {
+  const keywords = /\b(ADD|ALL|ALTER|AND|ANY|AS|ASC|BEGIN|BETWEEN|BIGINT|BINARY|BIT|BLOB|BOOLEAN|BY|CASCADE|CASE|CHANGE|CHAR|CHARACTER|CHECK|COALESCE|COLLATE|COLUMN|COMMIT|CONSTRAINT|CONVERT|CREATE|CROSS|CURRENT_TIMESTAMP|CURRENT_DATE|CURRENT_TIME|DATABASE|DATE|DATETIME|DECIMAL|DECLARE|DEFAULT|DELETE|DESC|DESCRIBE|DISTINCT|DOUBLE|DROP|ELSE|END|ENUM|ESCAPE|EXISTS|EXPLAIN|FLOAT|FOREIGN|FOR|FROM|FULL|FUNCTION|GROUP|HAVING|IDENTITY|IF|IN|INDEX|INNER|INSERT|INT|INTEGER|INTERSECT|INTO|INOUT|IS|JOIN|KEY|LEFT|LIKE|LIMIT|LONGBLOB|LONGTEXT|MATCHED|MEDIUMBLOB|MEDIUMINT|MEDIUMTEXT|MODIFY|NOT|NULL|NUMERIC|ON|OPTION|OR|ORDER|OUT|OUTER|PARTITION|PLAIN|PRECISION|PRIMARY|PROCEDURE|RANGE|REAL|REFERENCES|REGEXP|RENAME|REPLACE|RIGHT|ROLLBACK|ROW|ROWS|SCHEMA|SELECT|SESSION|SET|SHOW|SMALLINT|SOME|START|TABLE|TEXT|THEN|TIME|TIMESTAMP|TINYBLOB|TINYINT|TINYTEXT|TO|TRANSACTION|TRIGGER|TRUNCATE|UNION|UNIQUE|UNSIGNED|UPDATE|USAGE|USE|USING|VALUES|VARCHAR|VARYING|VIEW|WHEN|WHERE|WHILE|WITH|WRITE|YEAR|ZEROFILL)\b/gi
+  s = s.replace(/'(?:[^'\\]|\\.)*'/g, '<span class="hl-string">$&</span>')
+  s = s.replace(/`[^`]+`/g, '<span class="hl-string">$&</span>')
+  s = s.replace(/\b(-?\d+(?:\.\d+)?)\b/g, '<span class="hl-number">$1</span>')
+  s = s.replace(keywords, '<span class="hl-keyword">$1</span>')
+  s = s.replace(/(--[\s\S]*?)(?:\n|$)/g, '<span class="hl-comment">$1</span>')
+  s = s.replace(/\/\*[\s\S]*?\*\//g, '<span class="hl-comment">$&</span>')
+  return s
+}
+
 const highlighted = computed(() => highlight(props.modelValue))
 
 const LANG_LABEL: Record<string, string> = {
   json: 'JSON', java: 'Java', yaml: 'YAML', toml: 'TOML',
-  xml: 'XML', csv: 'CSV', properties: 'Properties', plaintext: 'Text',
+  xml: 'XML', csv: 'CSV', properties: 'Properties', sql: 'SQL', plaintext: 'Text',
 }
 const langLabel = computed(() => LANG_LABEL[props.language] || 'Text')
 
@@ -323,9 +342,8 @@ function handlePaste() {
   z-index: 1;
 }
 .highlight-layer.is-readonly {
-  position: relative;
-  left: 0;
   pointer-events: auto;
+  overflow: auto;
 }
 
 .highlight-pre {

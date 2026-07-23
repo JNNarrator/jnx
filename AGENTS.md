@@ -33,12 +33,29 @@ No test framework, no test files, no lint/formatter config.
 
 ## CodeEditor conventions
 
-All code inputs use `CodeEditor.vue` (8 languages: json/java/yaml/toml/xml/csv/properties/plaintext). Not textarea, not NInput.
+All code inputs use `CodeEditor.vue` (9 languages: json/java/yaml/toml/xml/csv/properties/sql/plaintext). Not textarea, not NInput.
 
 - Tab → 2-space indent / block-indent. Shift+Tab → block-outdent. Enter → auto-indent (YAML colon detection).
-- Language prop is typed — must match one of the 8 supported values.
+- Language prop is typed — must match one of the 9 supported values.
 - For readonly output, use `:model-value` + `readonly`.
 - Highlighters are pure-function tokenizers: strings before keywords, full span closure, `escapeHtml` for non-string segments. No cross-line state.
+- Model must stay pure text. All setter paths `stripHtml()` — highlight is display-only via `v-html`.
+
+## DDL ⇄ Java tool
+
+Located in `src/views/ToolDdlJava.vue` with utils in `src/utils/ddl*.ts`:
+- **ddlTypes.ts** — IR model types (IRModel/IRTable/IRField/IRIndex/FieldRole/DdlDialect/AnnotationStyle)
+- **ddlOptions.ts** — DdlOptions with 20+ knobs
+- **ddlTokenizer.ts** — string-aware SQL tokenizer (supports `--`/`/* */` inside strings)
+- **ddlTypeMap.ts** — MySQL/PG/OB ↔ Java type mapping
+- **ddlParser.ts** — DDL → IR (CREATE TABLE + COMMENT ON, 3 dialects)
+- **javaEntityParser.ts** — Java source → IR (annotation detection, role inference)
+- **ddlToJava.ts** — IR → Java entity (wraps `generateClassCode` with role annotation injection)
+- **ddlRenderer.ts** — IR → DDL (3 dialects)
+- **FieldTable.vue** — Editable NDataTable field editor + table properties + index editor
+- **ToolDdlJava.vue** — 3-zone layout: collapsible input → field table (main stage) → sticky output
+- Direction: DDL → Java (parse → edit → generate) or Java → DDL (parse → edit → render)
+- Annotation styles: none / lombok / mybatis-plus / lombok+jpa / lombok+mp
 
 ## ToolBar button hints
 

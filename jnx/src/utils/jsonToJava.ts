@@ -254,49 +254,54 @@ function inferFields(obj: Record<string, unknown>, opts: GenOptions, parentChain
   const fields: MemberField[] = []
   const nested: ClassDef[] = []
 
-  if (parentChain.includes(className)) {
-    // Circular reference
+  // Circular reference: check ANCESTORS only (parent chain minus self)
+  const ancestors = parentChain.slice(0, -1)
+  if (ancestors.includes(className)) {
     return { className, fields, nested }
   }
 
-  for (const [key, value] of Object.entries(obj)) {
-    const fieldName = toJavaFieldName(key, opts.fieldNaming)
-    let javaType: string
-    let nestedClass: ClassDef | null = null
+  const childChain = [...parentChain, className]
 
-    if (value !== null && value !== undefined && typeof value === 'object') {
-      if (Array.isArray(value)) {
-        if (value.length > 0) {
-          // Check if array contains objects
-          const nonNullObj = value.find(v => v !== null && v !== undefined && typeof v === 'object' && !Array.isArray(v))
-          if (nonNullObj) {
-            const elemName = toClassName(key) + 'Item'
-            nestedClass = inferFields(nonNullObj as Record<string, unknown>, opts, [...parentChain, elemName])
-            nestedClass.className = elemName
-            nested.push(nestedClass)
-            javaType = `List<${elemName}>`
+  for (const [key, value] of Object.entries(obj)) {
+    try {
+      const fieldName = toJavaFieldName(key, opts.fieldNaming)
+      let javaType: string
+      let nestedClass: ClassDef | null = null
+
+      if (value !== null && value !== undefined && typeof value === 'object') {
+        if (Array.isArray(value)) {
+          if (value.length > 0) {
+            const nonNullObj = value.find(v => v !== null && v !== undefined && typeof v === 'object' && !Array.isArray(v))
+            if (nonNullObj) {
+              const elemName = toClassName(key) + 'Item'
+              nestedClass = inferFields(nonNullObj as Record<string, unknown>, opts, [...childChain, elemName])
+              nestedClass.className = elemName
+              nested.push(nestedClass)
+              javaType = `List<${elemName}>`
+            } else {
+              const nonNullPrim = value.find(v => v !== null && v !== undefined)
+              const elemType = nonNullPrim !== undefined ? inferJavaType(nonNullPrim, opts.numberStrategy, opts.nullStrategy) : 'Object'
+              javaType = `List<${elemType}>`
+            }
           } else {
-            // Primitive array
-            const nonNullPrim = value.find(v => v !== null && v !== undefined)
-            const elemType = nonNullPrim !== undefined ? inferJavaType(nonNullPrim, opts.numberStrategy, opts.nullStrategy) : 'Object'
-            javaType = `List<${elemType}>`
+            javaType = 'List<Object>'
           }
         } else {
-          javaType = 'List<Object>'
+          const nestedName = toClassName(key)
+          nestedClass = inferFields(value as Record<string, unknown>, opts, [...childChain, nestedName])
+          nestedClass.className = nestedName
+          nested.push(nestedClass)
+          javaType = nestedName
         }
       } else {
-        // Nested object
-        const nestedName = toClassName(key)
-        nestedClass = inferFields(value as Record<string, unknown>, opts, [...parentChain, nestedName])
-        nestedClass.className = nestedName
-        nested.push(nestedClass)
-        javaType = nestedName
+        javaType = inferJavaType(value, opts.numberStrategy, opts.nullStrategy)
       }
-    } else {
-      javaType = inferJavaType(value, opts.numberStrategy, opts.nullStrategy)
-    }
 
-    fields.push({ name: fieldName, originalKey: key, type: javaType, rawValue: value })
+      fields.push({ name: fieldName, originalKey: key, type: javaType, rawValue: value })
+    } catch (_) {
+      // 细粒度容错：单个字段推断失败不炸掉整个对象的字段列表
+      fields.push({ name: toJavaFieldName(key, opts.fieldNaming), originalKey: key, type: 'Object', rawValue: value })
+    }
   }
 
   return { className, fields, nested }

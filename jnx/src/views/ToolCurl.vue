@@ -150,7 +150,7 @@ function statusTextClass(c: number): string {
         <template v-if="loading">
           <span class="spinner"></span> 发送中…
         </template>
-        <template v-else>发送 <Kbd :keys="['⌘↵']" /></template>
+        <template v-else>发送 <Kbd :keys="['mod', 'Enter']" /></template>
       </button>
       <button v-if="loading" class="btn-ghost" @click="cancel">取消</button>
       <button class="btn-ghost" @click="openCurlDialog" title="从 cURL 命令导入">
