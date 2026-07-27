@@ -21,10 +21,12 @@ import { useAppShortcuts, useCommandPaletteActions } from './composables/useAppS
 import { usePlatform } from './composables/usePlatform'
 import { ALL_TOOLS } from './types'
 import { pruneAllDrafts } from './composables/useToolDraft'
+import { useSsoStore } from './stores/sso'
 
 const tools = useToolsStore()
 const settings = useSettingsStore()
 const bindings = useShortcutBindingsStore()
+const sso = useSsoStore()
 const { isWin } = usePlatform()
 
 // KeepAlive include list: cache only tool pages (exclude settings/shortcuts/home)
@@ -42,6 +44,7 @@ onMounted(async () => {
   } catch (_) { console.warn('后端不可用') }
   document.documentElement.setAttribute('data-platform', isWin.value ? 'windows' : 'macos')
   try { useCommandPaletteActions() } catch (_) { /* 非组件作用域兜底 */ }
+  sso.init().catch(() => {}) /* SSO 异步恢复，不阻塞首屏 */
   loaded.value = true
 })
 

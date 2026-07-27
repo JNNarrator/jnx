@@ -4,6 +4,7 @@ import { useCommandPaletteStore } from '../stores/commandPalette'
 import { ICONS } from '../theme/icons'
 import { computed } from 'vue'
 import Kbd from './Kbd.vue'
+import SsoAvatar from './SsoAvatar.vue'
 
 const settings = useSettingsStore()
 const palette = useCommandPaletteStore()
@@ -37,6 +38,8 @@ function openSearch() { palette.openPalette() }
 
       <!-- Version -->
       <span class="version">v0.1.0</span>
+
+      <SsoAvatar />
     </div>
   </header>
 </template>

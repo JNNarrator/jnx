@@ -1,5 +1,102 @@
 use tauri_plugin_sql::{Migration, MigrationKind};
+use tauri_plugin_store;
 use serde::Serialize;
+use tauri::{Emitter, Manager};
+
+fn extract_query_param<'a>(s: &'a str, param: &str) -> Option<&'a str> {
+    let query_start = s.find('?')?;
+    let query = &s[query_start + 1..];
+    for pair in query.split('&') {
+        let mut parts = pair.splitn(2, '=');
+        let key = parts.next()?;
+        if key == param {
+            return Some(parts.next().unwrap_or(""));
+        }
+    }
+    None
+}
+
+/// Try to extract a ticket/token from the URL query string.
+/// Checks multiple common SSO parameter names in order.
+fn extract_sso_token(url: &str) -> Option<String> {
+    for param in &["ticket", "satoken", "code", "token", "st"] {
+        if let Some(val) = extract_query_param(url, param) {
+            if !val.is_empty() {
+                return Some(val.to_string());
+            }
+        }
+    }
+    None
+}
+
+#[tauri::command]
+fn open_sso_login(
+    app: tauri::AppHandle,
+    auth_url: String,
+    callback_url: String,
+) -> Result<(), String> {
+    if let Some(w) = app.get_webview_window("sso-login") {
+        let _ = w.close();
+    }
+
+    let url = reqwest::Url::parse(&auth_url).map_err(|e| format!("url: {e}"))?;
+
+    let window = tauri::WebviewWindowBuilder::new(
+        &app,
+        "sso-login",
+        tauri::WebviewUrl::External(url),
+    )
+    .inner_size(600.0, 800.0)
+    .center()
+    .resizable(false)
+    .title("JNX - SSO登录")
+    .on_navigation({
+        let app = app.clone();
+        let cb = callback_url.clone();
+        move |nav_url| {
+            let s = nav_url.as_str();
+            let matches = s.starts_with(&cb);
+            let ticket = extract_sso_token(s);
+
+            eprintln!("[SSO NAV] url={} matches={} ticket={:?}", s, matches, ticket);
+
+            let _ = app.emit("sso-debug-nav", serde_json::json!({
+                "url": s,
+                "matches": matches,
+                "ticket": ticket,
+            }));
+
+            if matches {
+                if let Some(ref t) = ticket {
+                    let _ = app.emit("sso-ticket", serde_json::json!({ "ticket": t }));
+                    // Only close window when we actually have a ticket
+                    if let Some(w) = app.get_webview_window("sso-login") {
+                        let _ = w.close();
+                    }
+                    false
+                } else {
+                    // Callback URL matched but no ticket found — let the page load
+                    // so the user can see what happened; log for debugging
+                    eprintln!("[SSO WARN] callback URL matched but no ticket/token found in query");
+                    true
+                }
+            } else {
+                true
+            }
+        }
+    })
+    .build()
+    .map_err(|e| format!("build: {e}"))?;
+
+    let app2 = app.clone();
+    window.on_window_event(move |event| {
+        if matches!(event, tauri::WindowEvent::CloseRequested { .. }) {
+            let _ = app2.emit("sso-login-cancelled", ());
+        }
+    });
+
+    Ok(())
+}
 
 #[derive(Serialize)]
 struct CustomFetchResponse {
@@ -92,7 +189,8 @@ pub fn run() {
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_os::init())
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
-        .invoke_handler(tauri::generate_handler![custom_fetch])
+        .plugin(tauri_plugin_store::Builder::default().build())
+        .invoke_handler(tauri::generate_handler![custom_fetch, open_sso_login])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
