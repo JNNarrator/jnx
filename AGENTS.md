@@ -23,7 +23,8 @@ No test framework, no test files, no lint/formatter config.
 ## Architecture
 
 - **No router**: App.vue uses `componentMap` + `<component :is>` + KeepAlive. Add new tool: create view → register in `ALL_TOOLS` (types/index.ts) → add to `componentMap` in App.vue.
-- **State**: Pinia stores (6 total: tools/settings/clipboard/http/shortcutBindings/commandPalette). SQLite via `tauri-plugin-sql` for settings + clipboard.
+- **State**: Pinia stores (7 total: tools/settings/clipboard/http/shortcutBindings/commandPalette/sso). SQLite via `tauri-plugin-sql` for settings + clipboard; SSO token 持久化用 plugin-store `sso.json`.
+- **SSO 登录**: `stores/sso.ts` + `src/sso/`（config/ssoFetch/types），打开 Tauri 登录窗口经 `applyTicket` 换取 token；顶栏 `SsoAvatar.vue` 展示登录态。`useHttpSend` 之外的 SSO 请求走 `ssoFetch`。
 - **Theme**: light/dark via CSS vars on `:root`. `App.vue` watchEffect sets vars. Naive UI `NConfigProvider` synced. Theme values only `'light' | 'dark'`.
 - **Naive UI primary color**: Overridden to `#E85D75` via `themeOverrides` in App.vue. All `type="primary"` NButtons are pink.
 - **Keyboard shortcuts**: Custom system in `composables/useKeyboardShortcut.ts`. Actions defined in `shortcuts/index.ts`. Use `useKeyboardShortcut(action, handler)` — never raw `addEventListener`. Legacy: `useLegacyShortcut()` for ToolCurl-only keys.

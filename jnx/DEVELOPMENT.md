@@ -14,12 +14,12 @@ jnx 是一个基于 Tauri v2 + Vue 3 + TypeScript 的桌面开发者工具箱，
 | 前端框架 | **Vue 3** (Composition API + `<script setup>`) | SFC 组件 |
 | 语言 | **TypeScript** ~5.6 | 全栈类型安全 |
 | 构建 | **Vite 6** + **vue-tsc** | 开发服务器 `:1420`，Tauri 定制配置 |
-| 状态管理 | **Pinia** | 6 个 Store 各司其职 |
+| 状态管理 | **Pinia** | 7 个 Store 各司其职 |
 | UI 组件库 | **Naive UI** | `NConfigProvider` + `NMessageProvider`，主题与字体通过 `themeOverrides` 注入 |
 | CSS 变量 | 自定义主题系统 | **light / dark 两套**（已移除 pink / system） |
 | 持久化 | SQLite (`tauri-plugin-sql`) | `settings` 表（KV）+ `clipboard_history` 表 |
 | 包管理 | npm | node >=18 |
-| 语法高亮 | 自研纯函数 tokenizer（8 种语言） | 字符串优先匹配，完整闭合 span，无正则回溯 DoS |
+| 语法高亮 | 自研纯函数 tokenizer（9 种语言） | 字符串优先匹配，完整闭合 span，无正则回溯 DoS |
 | Rust 依赖 | reqwest 0.12, serde, tauri-plugin-* | HTTP 请求、快捷键、系统信息等 |
 | 快捷键 | 自研 `useKeyboardShortcut` 系统 | 平台感知（mod = ⌘/Ctrl）、可自定义覆盖、冲突检测 |
 | 字体 | **JetBrains Mono**（本地 woff2 自托管） | `@font-face` 在 `assets/styles/fonts.css` 声明，`main.ts` 引入；Naive UI themeOverrides 同步注入 |
@@ -56,6 +56,7 @@ jnx/
 │   │   ├── HeaderEditor.vue    # HTTP 请求头编辑器
 │   │   ├── DraggableSplitter.vue # 可拖拽分隔条
 │   │   ├── FieldTable.vue      # DDL⇄Java 可编辑字段表格（NDataTable + 表属性 + 索引编辑）
+│   │   ├── SsoAvatar.vue       # SSO 登录头像（登录/用户信息/登出）
 │   │   └── Kbd.vue             # 快捷键展示组件（读运行时真实绑定）
 │   ├── views/                  # 页面视图
 │   │   ├── HomeView.vue        # 首页（分层布局：搜索 / 最近使用 / 分类网格 / 快捷键速查）
@@ -74,7 +75,8 @@ jnx/
 │   │   ├── clipboard.ts        # 剪贴板历史（轮询 + 持久化）
 │   │   ├── http.ts             # HTTP 请求/响应状态
 │   │   ├── shortcutBindings.ts # 快捷键绑定（平台感知 + 用户覆盖 + 冲突检测）
-│   │   └── commandPalette.ts   # 命令面板状态与过滤
+│   │   ├── commandPalette.ts   # 命令面板状态与过滤
+│   │   └── sso.ts              # SSO 登录状态（token/user，plugin-store 持久化）
 │   ├── composables/            # Vue 组合式函数
 │   │   ├── useAppShortcuts.ts  # 应用级快捷键注册 + 命令面板动作注册
 │   │   ├── useHttpSend.ts      # HTTP 发送（invoke custom_fetch）
@@ -99,7 +101,11 @@ jnx/
 │   │   ├── ddlParser.ts        # DDL → IR 解析
 │   │   ├── javaEntityParser.ts # Java → IR 解析
 │   │   ├── ddlToJava.ts        # IR → Java 代码生成
-│   │   └── ddlRenderer.ts      # IR → DDL 渲染（3 方言）
+│   │   ├── ddlRenderer.ts      # IR → DDL 渲染（3 方言）
+│   │   ├── jsonToJava.ts       # JSON → Java 类生成
+│   │   ├── javaToJson.ts       # Java 源码 → 示例 JSON
+│   │   ├── javaLightParser.ts  # 轻量 Java 源码解析器
+│   │   └── naming.ts           # 命名/大小写转换
 │   ├── assets/                 # 静态资源
 │   │   ├── fonts/              # JetBrains Mono woff2 字体文件（SIL Open Font License 1.1，自托管）
 │   │   └── styles/
@@ -122,7 +128,7 @@ jnx/
 
 ---
 
-## 6 个 Pinia Store 详解
+## 7 个 Pinia Store 详解
 
 | Store | 职责 | 关键状态 | 持久化 |
 |-------|------|---------|--------|
@@ -132,6 +138,7 @@ jnx/
 | **http** | HTTP 请求构建 | request, response | 否（内存） |
 | **shortcutBindings** | 快捷键覆盖 | overrides | SQLite settings 表（`shortcuts.overrides` 键，JSON） |
 | **commandPalette** | 命令面板 | open, query, actions[] | 否（内存） |
+| **sso** | SSO 登录状态 | token, user, loggedIn | plugin-store `sso.json`（`jn-token` 键） |
 
 **数据流模式**：
 - 各 View 通过 `useXxxStore()` 获取 Store 实例
@@ -153,7 +160,7 @@ jnx/
 - **mod 抽象**：chord 用 `mod` 表示主修饰键，运行时按平台展开（mac → ⌘/meta，win → Ctrl）。
 - **输入框聚焦时不一刀切**：导航/全局类键（`skipWhenEditing=false`）在 input/textarea 聚焦时仍生效；仅 `⌘C/⌘V/⌘X/⌘Z/⌘A/⌘S` 等编辑保留组合透传给浏览器原生编辑行为。
 - **调试日志**：`localStorage.setItem('jnx.kbd.debug','1')` 打开后，每次按键在 console 打印 `{code, key, metaKey, ctrlKey, altKey, shiftKey, activeElementTag, editing, hitAction}`，用于区分「没收到事件」还是「收到但被默认动作覆盖」。
-- **ToolCurl 仍有 `useLegacyShortcut`**：JSON 工具用新的 action 注册，HTTP 工具的部分键（`Cmd+I`/`Cmd+L`）暂走 legacy 形态以便快速调整，不进注册中心。
+- **ToolCurl 仍有 `useLegacyShortcut`**：JSON 工具用新的 action 注册，HTTP 工具的部分键（`Cmd+Shift+I`/`Cmd+L`）暂走 legacy 形态以便快速调整，不进注册中心。
 
 ### 架构
 
@@ -186,15 +193,20 @@ jnx/
 
 | 动作 | Mac | Windows | 说明 |
 |------|-----|---------|------|
-| `global.search` | ⌘K | Ctrl+K | 全局搜索面板（保留，已 preventDefault） |
+| `global.search` | ⌘K | Ctrl+K | 全局搜索面板（已 preventDefault） |
+| `global.palette` | ⌘⇧P | Ctrl+Shift+P | 命令面板 |
+| `app.settings` | ⌘, | Ctrl+, | 打开设置 |
+| `app.shortcutsPanel` | ⌘/ | Ctrl+/ | 快捷键自定义面板 |
+| `nav.toggleSidebar` | ⌘\ | Ctrl+\ | 切换侧栏 |
 | `nav.toHome` | ⌘⇧1 | Ctrl+Shift+1 | 避开 webview ⌘1 切标签 |
 | `nav.toJson` | ⌘⇧J | Ctrl+Shift+J | 避开 webview ⌘J 下载页 |
 | `nav.toHttp` | ⌘⇧H | Ctrl+Shift+H | 避开 macOS ⌘H 隐藏窗口 |
-| `nav.toClipboard` | ⌘⇧B | Ctrl+Shift+B | |
-| `nav.toSettings` | ⌘⇧S | Ctrl+Shift+S | |
-| `nav.toShortcuts` | ⌘⇧/ | Ctrl+Shift+/ | |
+| `nav.toConverter` | ⌘⇧E | Ctrl+Shift+E | 格式互转 |
+| `nav.toCron` | ⌘⇧X | Ctrl+Shift+X | Cron 表达式 |
+| `nav.toClipboard` | ⌘⇧B | Ctrl+Shift+B | 剪贴板历史 |
+| `nav.toSettings` | ⌘⇧S | Ctrl+Shift+S | 设置页 |
+| `nav.toShortcuts` | ⌘⇧/ | Ctrl+Shift+/ | 快捷键页 |
 | `theme.cycle` | ⌘⇧T | Ctrl+Shift+T | 二态切换（light↔dark） |
-| `app.settings` | ⌘, | Ctrl+, | |
 | `json.run` | ⌘↵ | Ctrl+Enter | |
 | `json.format` | ⌘⇧F | Ctrl+Shift+F | |
 | `clipboard.pin` | ⌘⇧C | Ctrl+Shift+C | |

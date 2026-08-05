@@ -16,7 +16,7 @@
 | **剪贴板历史** | 监听系统剪贴板，保存历史记录，快速回贴 |
 | **快捷键设置** | 所有工具快捷键可视化查看与自定义 |
 
-所有代码输入框均支持**语法高亮**（JSON / Java / YAML / TOML / XML / CSV / Properties / Plaintext），行号显示，Tab 缩进，Enter 自动缩进。
+所有代码输入框均支持**语法高亮**（JSON / Java / YAML / TOML / XML / CSV / Properties / SQL / Plaintext），行号显示，Tab 缩进，Enter 自动缩进。
 
 ---
 
